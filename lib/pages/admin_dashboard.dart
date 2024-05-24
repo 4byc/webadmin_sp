@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'settings_page.dart';
 import 'parking_lot_page.dart';
+import 'history_page.dart'; // Import the history page
 import 'package:firebase_auth/firebase_auth.dart';
 
 class AdminDashboard extends StatefulWidget {
@@ -105,13 +105,13 @@ class _AdminDashboardState extends State<AdminDashboard> {
               },
             ),
             ListTile(
-              leading: const Icon(Icons.settings),
-              title: const Text('Settings'),
+              leading: const Icon(Icons.history),
+              title: const Text('History'),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const SettingsPage()),
+                  MaterialPageRoute(builder: (context) => const HistoryPage()),
                 );
               },
             ),

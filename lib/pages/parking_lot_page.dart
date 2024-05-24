@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart'; // Import the intl package
 
 class ParkingLotPage extends StatefulWidget {
   const ParkingLotPage({super.key});
@@ -13,52 +14,64 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   Future<void> _refreshParkingSlots() async {
-    // Fetch detections
-    QuerySnapshot detectionSnapshot =
-        await _firestore.collection('detections').get();
-    for (var detectionDoc in detectionSnapshot.docs) {
-      var detectionData = detectionDoc.data() as Map<String, dynamic>;
-      String vehicleId = detectionData['VehicleID'];
-      String vehicleClass = detectionData['class'];
-      int entryTime = detectionData['time'];
+    try {
+      // Fetch detections
+      QuerySnapshot detectionSnapshot =
+          await _firestore.collection('detections').get();
+      for (var detectionDoc in detectionSnapshot.docs) {
+        var detectionData = detectionDoc.data() as Map<String, dynamic>;
+        String vehicleId = detectionData['VehicleID'];
+        String vehicleClass = detectionData['class'];
+        int entryTime = (detectionData['time'] as num).toInt();
 
-      // Find an available slot
-      QuerySnapshot parkingSlotSnapshot =
-          await _firestore.collection('parkingSlots').get();
-      bool slotAssigned = false;
+        // Find an available slot
+        QuerySnapshot parkingSlotSnapshot =
+            await _firestore.collection('parkingSlots').get();
+        bool slotAssigned = false;
 
-      for (var slotDoc in parkingSlotSnapshot.docs) {
-        var slotData = slotDoc.data() as Map<String, dynamic>;
-        List<dynamic> slots = slotData['slots'];
+        for (var slotDoc in parkingSlotSnapshot.docs) {
+          var slotData = slotDoc.data() as Map<String, dynamic>;
+          List<dynamic> slots = slotData['slots'];
 
-        for (var slot in slots) {
-          if (slot['slotClass'] == vehicleClass && !slot['isFilled']) {
-            // Assign the slot
-            slot['isFilled'] = true;
-            slot['vehicleId'] = vehicleId;
-            slot['entryTime'] = entryTime;
+          for (var slot in slots) {
+            if (slot['slotClass'] == vehicleClass && !slot['isFilled']) {
+              // Assign the slot
+              slot['isFilled'] = true;
+              slot['vehicleId'] = vehicleId;
+              slot['entryTime'] = entryTime;
 
-            await _firestore.collection('parkingSlots').doc(slotDoc.id).update({
-              'slots': slots,
-            });
+              await _firestore
+                  .collection('parkingSlots')
+                  .doc(slotDoc.id)
+                  .update({
+                'slots': slots,
+              });
 
-            // Remove the detection entry
-            await _firestore
-                .collection('detections')
-                .doc(detectionDoc.id)
-                .delete();
+              // Remove the detection entry
+              await _firestore
+                  .collection('detections')
+                  .doc(detectionDoc.id)
+                  .delete();
 
-            slotAssigned = true;
+              slotAssigned = true;
+              break;
+            }
+          }
+
+          if (slotAssigned) {
             break;
           }
         }
-
-        if (slotAssigned) {
-          break;
-        }
       }
+      setState(() {});
+    } catch (e) {
+      print("Error while refreshing parking slots: $e");
     }
-    setState(() {});
+  }
+
+  String _formatTimestamp(int timestamp) {
+    var date = DateTime.fromMillisecondsSinceEpoch(timestamp * 1000);
+    return DateFormat('yyyy-MM-dd HH:mm:ss').format(date);
   }
 
   @override
@@ -104,32 +117,35 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
 
           return SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            child: DataTable(
-              columns: const [
-                DataColumn(label: Text('Slot ID')),
-                DataColumn(label: Text('Class')),
-                DataColumn(label: Text('Status')),
-                DataColumn(label: Text('Entry Time')),
-              ],
-              rows: slots.map((slot) {
-                return DataRow(
-                  cells: [
-                    DataCell(Text(slot['id'])),
-                    DataCell(Text(slot['slotClass'])),
-                    DataCell(
-                      Icon(
-                        Icons.local_parking,
-                        color: slot['isFilled'] ? Colors.red : Colors.green,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.vertical,
+              child: DataTable(
+                columns: const [
+                  DataColumn(label: Text('Slot ID')),
+                  DataColumn(label: Text('Class')),
+                  DataColumn(label: Text('Status')),
+                  DataColumn(label: Text('Entry Time')),
+                ],
+                rows: slots.map((slot) {
+                  return DataRow(
+                    cells: [
+                      DataCell(Text(slot['id'])),
+                      DataCell(Text(slot['slotClass'])),
+                      DataCell(
+                        Icon(
+                          Icons.local_parking,
+                          color: slot['isFilled'] ? Colors.red : Colors.green,
+                        ),
                       ),
-                    ),
-                    DataCell(
-                      slot['isFilled']
-                          ? Text('${slot['entryTime']}')
-                          : const Text('-'),
-                    ),
-                  ],
-                );
-              }).toList(),
+                      DataCell(
+                        slot['isFilled']
+                            ? Text(_formatTimestamp(slot['entryTime']))
+                            : const Text('-'),
+                      ),
+                    ],
+                  );
+                }).toList(),
+              ),
             ),
           );
         },
