@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:intl/intl.dart'; // Add this for date formatting
+import 'package:intl/intl.dart';
 import 'package:webadmin_sp/widgets/common_drawer.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -11,7 +11,7 @@ class DashboardPage extends StatefulWidget {
 
 class _DashboardPageState extends State<DashboardPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  String _sortOrder = 'desc'; // Default sorting order
+  String _sortOrder = 'desc';
 
   Future<Map<String, dynamic>> _fetchAdminData() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -32,10 +32,10 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Dashboard'),
+        title: Text('Dashboard', style: TextStyle(color: Colors.blue)),
         actions: <Widget>[
           IconButton(
-            icon: Icon(Icons.sort),
+            icon: Icon(Icons.sort, color: Colors.blue),
             onPressed: () {
               setState(() {
                 _sortOrder = _sortOrder == 'asc' ? 'desc' : 'asc';
@@ -43,19 +43,25 @@ class _DashboardPageState extends State<DashboardPage> {
             },
           ),
         ],
+        backgroundColor: Colors.white,
+        iconTheme: IconThemeData(color: Colors.blue),
       ),
       drawer: CommonDrawer(),
       body: FutureBuilder<Map<String, dynamic>>(
         future: _fetchAdminData(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
+            return Center(child: CircularProgressIndicator(color: Colors.cyan));
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Error fetching admin data'));
+            return Center(
+                child: Text('Error fetching admin data',
+                    style: TextStyle(color: Colors.red)));
           }
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return Center(child: Text('No admin data found'));
+            return Center(
+                child: Text('No admin data found',
+                    style: TextStyle(color: Colors.red)));
           }
 
           final adminData = snapshot.data!;
@@ -63,7 +69,8 @@ class _DashboardPageState extends State<DashboardPage> {
             children: <Widget>[
               Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: Text('Welcome, ${adminData['name']}'),
+                child: Text('Welcome, ${adminData['name']}',
+                    style: TextStyle(color: Colors.blue, fontSize: 18)),
               ),
               Expanded(
                 child: StreamBuilder<QuerySnapshot>(
@@ -73,13 +80,18 @@ class _DashboardPageState extends State<DashboardPage> {
                       .snapshots(),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
-                      return Center(child: CircularProgressIndicator());
+                      return Center(
+                          child: CircularProgressIndicator(color: Colors.cyan));
                     }
                     if (snapshot.hasError) {
-                      return Center(child: Text('Error fetching detections'));
+                      return Center(
+                          child: Text('Error fetching detections',
+                              style: TextStyle(color: Colors.red)));
                     }
                     if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                      return Center(child: Text('No detections found'));
+                      return Center(
+                          child: Text('No detections found',
+                              style: TextStyle(color: Colors.red)));
                     }
 
                     var detections = snapshot.data!.docs;
@@ -93,6 +105,7 @@ class _DashboardPageState extends State<DashboardPage> {
                           padding: const EdgeInsets.all(8.0),
                           child: Card(
                             elevation: 5,
+                            color: Colors.blue[50],
                             child: Padding(
                               padding: const EdgeInsets.all(16.0),
                               child: Column(
@@ -101,13 +114,16 @@ class _DashboardPageState extends State<DashboardPage> {
                                   Text('Vehicle ID: ${detection['VehicleID']}',
                                       style: TextStyle(
                                           fontSize: 18,
-                                          fontWeight: FontWeight.bold)),
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.blue)),
                                   SizedBox(height: 8),
                                   Text('Class: ${detection['class']}',
-                                      style: TextStyle(fontSize: 16)),
+                                      style: TextStyle(
+                                          fontSize: 16, color: Colors.cyan)),
                                   SizedBox(height: 8),
                                   Text('Entry Time: $entryTime',
-                                      style: TextStyle(fontSize: 16)),
+                                      style: TextStyle(
+                                          fontSize: 16, color: Colors.cyan)),
                                 ],
                               ),
                             ),

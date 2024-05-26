@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart'; // Add this for date formatting
+import 'package:intl/intl.dart'; // For date formatting
 import 'package:webadmin_sp/widgets/common_drawer.dart';
-import 'package:webadmin_sp/services/logging_service.dart'; // Import the logger
+import 'package:webadmin_sp/widgets/gradient_app_bar.dart';
 
 class ParkingLotPage extends StatefulWidget {
   @override
@@ -38,7 +38,7 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
       // Collect all detections
       for (var doc in detectionSnapshot.docs) {
         var data = doc.data() as Map<String, dynamic>;
-        logger.d('Detection data: $data');
+        print('Detection data: $data');
         detections[data['VehicleID'].toString()] = data;
       }
 
@@ -75,19 +75,14 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
             }
           }
 
-          // Update the slots in Firestore using a batch write
-          WriteBatch batch = _firestore.batch();
-          DocumentReference docRef =
-              _firestore.collection('parkingSlots').doc(className);
-          batch.update(docRef, {'slots': slots});
-          await batch.commit();
-
-          logger.i(
-              "Parking slots for class $className synchronized successfully.");
+          // Update the slots in Firestore
+          await _firestore.collection('parkingSlots').doc(className).update({
+            'slots': slots,
+          });
         }
       }
     } catch (e) {
-      logger.e('Error synchronizing parking slots: $e');
+      print('Error synchronizing parking slots: $e');
     }
   }
 
@@ -132,11 +127,12 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Parking Lot'),
+      appBar: GradientAppBar(
+        title: 'Parking Lot',
         actions: <Widget>[
           DropdownButton<String>(
             value: _selectedClass,
+            dropdownColor: Colors.blue,
             onChanged: (String? newValue) {
               setState(() {
                 _selectedClass = newValue!;
@@ -147,14 +143,18 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
                 .map<DropdownMenuItem<String>>((String value) {
               return DropdownMenuItem<String>(
                 value: value,
-                child: Text('Class $value'),
+                child: Text(
+                  'Class $value',
+                  style: TextStyle(color: Colors.white),
+                ),
               );
             }).toList(),
           ),
           IconButton(
-            icon: Icon(_sortOrder == 'asc'
-                ? Icons.arrow_upward
-                : Icons.arrow_downward),
+            icon: Icon(
+              _sortOrder == 'asc' ? Icons.arrow_upward : Icons.arrow_downward,
+              color: Colors.white,
+            ),
             onPressed: () {
               setState(() {
                 _sortOrder = _sortOrder == 'asc' ? 'desc' : 'asc';
@@ -162,7 +162,7 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
             },
           ),
           IconButton(
-            icon: Icon(Icons.refresh),
+            icon: Icon(Icons.refresh, color: Colors.white),
             onPressed: () {
               setState(() {
                 _synchronizeParkingSlots();
@@ -170,7 +170,7 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
             },
           ),
           PopupMenuButton<String>(
-            icon: Icon(Icons.filter_list),
+            icon: Icon(Icons.filter_list, color: Colors.white),
             onSelected: (String result) {
               setState(() {
                 _filter = result;

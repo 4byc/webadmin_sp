@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:webadmin_sp/pages/dashboard_page.dart';
 import 'package:webadmin_sp/pages/login_page.dart';
 import 'package:webadmin_sp/pages/history_page.dart';
-import 'package:webadmin_sp/pages/parking_lot_page.dart'; // Import the new page
+import 'package:webadmin_sp/pages/parking_lot_page.dart';
 import 'package:webadmin_sp/providers/auth_provider.dart'
     as local_auth_provider;
 import 'firebase_options.dart';
@@ -31,14 +31,19 @@ class MyApp extends StatelessWidget {
         title: 'Smart Parking Admin',
         theme: ThemeData(
           primarySwatch: Colors.blue,
+          scaffoldBackgroundColor: Colors.white,
+          textTheme: TextTheme(
+            bodyLarge: TextStyle(color: Colors.black),
+            bodyMedium: TextStyle(color: Colors.black),
+          ),
         ),
         initialRoute: '/',
-        debugShowCheckedModeBanner: false, // Remove debug banner
+        debugShowCheckedModeBanner: false,
         routes: {
           '/': (context) => LoginPage(),
           '/dashboard': (context) => DashboardPage(),
           '/history': (context) => HistoryPage(),
-          '/parking-lot': (context) => ParkingLotPage(), // Add the new route
+          '/parking-lot': (context) => ParkingLotPage(),
         },
       ),
     );

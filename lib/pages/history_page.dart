@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart'; // Add this for date formatting
+import 'package:intl/intl.dart'; // For date formatting
 import 'package:webadmin_sp/widgets/common_drawer.dart';
+import 'package:webadmin_sp/widgets/gradient_app_bar.dart';
 
 class HistoryPage extends StatefulWidget {
   @override
@@ -21,11 +22,11 @@ class _HistoryPageState extends State<HistoryPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('History'),
+      appBar: GradientAppBar(
+        title: 'History',
         actions: <Widget>[
           IconButton(
-            icon: Icon(Icons.sort),
+            icon: Icon(Icons.sort, color: Colors.white),
             onPressed: () {
               setState(() {
                 _sortOrder = _sortOrder == 'asc' ? 'desc' : 'asc';
@@ -68,6 +69,7 @@ class _HistoryPageState extends State<HistoryPage> {
                 padding: const EdgeInsets.all(8.0),
                 child: Card(
                   elevation: 5,
+                  color: Colors.white,
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
@@ -75,10 +77,12 @@ class _HistoryPageState extends State<HistoryPage> {
                       children: <Widget>[
                         Text('Vehicle ID: ${exit['vehicleId']}',
                             style: TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.bold)),
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue)),
                         SizedBox(height: 8),
                         Text('Class: ${exit['class']}',
-                            style: TextStyle(fontSize: 16)),
+                            style: TextStyle(fontSize: 16, color: Colors.cyan)),
                         SizedBox(height: 8),
                         Text('Exit Time: $exitTime',
                             style: TextStyle(fontSize: 16)),
