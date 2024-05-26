@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:webadmin_sp/features/auth_wrapper.dart';
+import 'package:provider/provider.dart';
+import 'package:webadmin_sp/pages/dashboard_page.dart';
 import 'package:webadmin_sp/pages/login_page.dart';
 import 'package:webadmin_sp/pages/history_page.dart';
+import 'package:webadmin_sp/pages/parking_lot_page.dart'; // Import the new page
+import 'package:webadmin_sp/providers/auth_provider.dart'
+    as local_auth_provider;
 import 'firebase_options.dart';
 
 void main() async {
@@ -14,23 +18,29 @@ void main() async {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Admin Dashboard',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+            create: (_) => local_auth_provider.AuthProvider()),
+      ],
+      child: MaterialApp(
+        title: 'Smart Parking Admin',
+        theme: ThemeData(
+          primarySwatch: Colors.blue,
+        ),
+        initialRoute: '/',
+        debugShowCheckedModeBanner: false, // Remove debug banner
+        routes: {
+          '/': (context) => LoginPage(),
+          '/dashboard': (context) => DashboardPage(),
+          '/history': (context) => HistoryPage(),
+          '/parking-lot': (context) => ParkingLotPage(), // Add the new route
+        },
       ),
-      debugShowCheckedModeBanner: false,
-      initialRoute: '/',
-      routes: {
-        '/': (context) => const AuthWrapper(),
-        '/login': (context) => const LoginPage(),
-        '/history': (context) => const HistoryPage(),
-      },
     );
   }
 }
