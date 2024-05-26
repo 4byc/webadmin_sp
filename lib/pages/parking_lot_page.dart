@@ -65,7 +65,11 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
             if (detection['class'] == className) {
               for (var slot in slots) {
                 if (slot['isFilled'] == false) {
-                  slot['entryTime'] = detection['time'];
+                  // Ensure entryTime is stored as an integer
+                  var entryTime = detection['time'] is double
+                      ? detection['time'].toInt()
+                      : detection['time'];
+                  slot['entryTime'] = entryTime;
                   slot['isFilled'] = true;
                   slot['vehicleId'] = int.tryParse(vehicleID) ??
                       vehicleID; // Ensure vehicleId is stored as a number
