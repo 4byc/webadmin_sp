@@ -18,20 +18,25 @@ class _LoginPageState extends State<LoginPage> {
   String _errorMessage = '';
 
   Future<void> _login() async {
+    if (_emailController.text.isEmpty || _passwordController.text.isEmpty) {
+      setState(() {
+        _errorMessage = 'Please enter both email and password';
+      });
+      return;
+    }
+
     try {
-      UserCredential userCredential = await _auth.signInWithEmailAndPassword(
+      await _auth.signInWithEmailAndPassword(
         email: _emailController.text,
         password: _passwordController.text,
       );
 
-      // Check if the user is an admin
       QuerySnapshot adminSnapshot = await _firestore
           .collection('admins')
           .where('email', isEqualTo: _emailController.text)
           .get();
 
       if (adminSnapshot.docs.isNotEmpty) {
-        // User is an admin, retrieve the name
         String adminName = adminSnapshot.docs.first['name'];
         Navigator.pushReplacement(
           context,
@@ -46,7 +51,7 @@ class _LoginPageState extends State<LoginPage> {
       }
     } catch (e) {
       setState(() {
-        _errorMessage = e.toString();
+        _errorMessage = 'Login failed: ${e.toString()}';
       });
     }
   }
@@ -54,35 +59,70 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Admin Login'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
+      body: Container(
+        color: Colors.white,
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.start,
           children: [
-            TextField(
-              controller: _emailController,
-              decoration: const InputDecoration(labelText: 'Email'),
-            ),
-            TextField(
-              controller: _passwordController,
-              decoration: const InputDecoration(labelText: 'Password'),
-              obscureText: true,
+            const SizedBox(height: 100),
+            const Image(
+              image: AssetImage(
+                  'images/icon.png'), // Change this to your icon's path
+              width: 100,
+              height: 100,
             ),
             const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _login,
-              child: const Text('Login'),
-            ),
-            if (_errorMessage.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Text(
-                  _errorMessage,
-                  style: const TextStyle(color: Colors.red),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Card(
+                elevation: 8.0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10.0),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Admin Login',
+                        style: TextStyle(
+                            fontSize: 24, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 20),
+                      TextField(
+                        controller: _emailController,
+                        decoration: const InputDecoration(labelText: 'Email'),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _passwordController,
+                        decoration:
+                            const InputDecoration(labelText: 'Password'),
+                        obscureText: true,
+                      ),
+                      const SizedBox(height: 20),
+                      ElevatedButton(
+                        onPressed: _login,
+                        child: const Text('Login'),
+                        style: ElevatedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 36),
+                        ),
+                      ),
+                      if (_errorMessage.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Text(
+                            _errorMessage,
+                            style: const TextStyle(color: Colors.red),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
+            ),
+            const Spacer(),
           ],
         ),
       ),

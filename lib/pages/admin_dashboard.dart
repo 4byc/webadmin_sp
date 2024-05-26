@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'parking_lot_page.dart';
-import 'history_page.dart'; // Import the history page
+import 'history_page.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class AdminDashboard extends StatefulWidget {
@@ -27,7 +27,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
   Future<void> _showLogoutConfirmationDialog() async {
     return showDialog<void>(
       context: context,
-      barrierDismissible: false, // user must tap button!
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text('Confirm Logout'),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart'; // Import the intl package
+import 'package:intl/intl.dart';
 
 class ParkingLotPage extends StatefulWidget {
   const ParkingLotPage({super.key});
@@ -15,7 +15,6 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
 
   Future<void> _refreshParkingSlots() async {
     try {
-      // Fetch detections
       QuerySnapshot detectionSnapshot =
           await _firestore.collection('detections').get();
       for (var detectionDoc in detectionSnapshot.docs) {
@@ -24,7 +23,6 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
         String vehicleClass = detectionData['class'];
         int entryTime = (detectionData['time'] as num).toInt();
 
-        // Find an available slot
         QuerySnapshot parkingSlotSnapshot =
             await _firestore.collection('parkingSlots').get();
         bool slotAssigned = false;
@@ -35,7 +33,6 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
 
           for (var slot in slots) {
             if (slot['slotClass'] == vehicleClass && !slot['isFilled']) {
-              // Assign the slot
               slot['isFilled'] = true;
               slot['vehicleId'] = vehicleId;
               slot['entryTime'] = entryTime;
@@ -47,7 +44,6 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
                 'slots': slots,
               });
 
-              // Remove the detection entry
               await _firestore
                   .collection('detections')
                   .doc(detectionDoc.id)

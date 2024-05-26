@@ -22,13 +22,14 @@ class MyApp extends StatelessWidget {
       title: 'Admin Dashboard',
       theme: ThemeData(
         primarySwatch: Colors.blue,
+        visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
       debugShowCheckedModeBanner: false,
       initialRoute: '/',
       routes: {
         '/': (context) => const AuthWrapper(),
         '/login': (context) => const LoginPage(),
-        '/history': (context) => const HistoryPage(), // Add the new route here
+        '/history': (context) => const HistoryPage(),
       },
     );
   }
