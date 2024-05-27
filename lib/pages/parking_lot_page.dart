@@ -129,6 +129,35 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
     return slots;
   }
 
+  void _showSlotDetails(Map<String, dynamic> slot) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('Slot ID: ${slot['id']}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text('Vehicle ID: ${slot['vehicleId'] ?? 'N/A'}'),
+              Text('Class: ${slot['slotClass'] ?? 'N/A'}'),
+              Text('Entry Time: ${_formatTimestamp(slot['entryTime'])}'),
+              Text('Is Filled: ${slot['isFilled'] ? 'Yes' : 'No'}'),
+            ],
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: Text('Close'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -215,31 +244,45 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
           var slots = _removeDuplicateSlots(_filterSlots(snapshot.data!));
           slots = _sortSlots(slots);
 
-          return ListView.builder(
+          return GridView.builder(
+            padding: const EdgeInsets.all(8.0),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 4, // Adjust the number of columns as needed
+              crossAxisSpacing: 8.0,
+              mainAxisSpacing: 8.0,
+            ),
             itemCount: slots.length,
             itemBuilder: (context, index) {
               var slot = slots[index];
-              var entryTime = _formatTimestamp(slot['entryTime']);
               bool isFilled = slot['isFilled'] ?? false;
 
-              return Padding(
-                padding: const EdgeInsets.all(8.0),
-                child: Card(
-                  elevation: 5,
-                  color: isFilled ? Colors.red[100] : Colors.green[100],
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
+              return GestureDetector(
+                onTap: () => _showSlotDetails(slot),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isFilled ? Colors.red[100] : Colors.green[100],
+                    borderRadius: BorderRadius.circular(10.0),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 4.0,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Center(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text('Slot ID: ${slot['id'] ?? 'N/A'}',
-                            style: TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.bold)),
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Slot ID: ${slot['id']}',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                         SizedBox(height: 8),
-                        Text('Vehicle ID: ${slot['vehicleId'] ?? 'N/A'}'),
-                        Text('Class: ${slot['slotClass'] ?? 'N/A'}'),
-                        Text('Entry Time: $entryTime'),
-                        Text('Is Filled: ${isFilled ? 'Yes' : 'No'}'),
+                        Text(isFilled ? 'Filled' : 'Empty'),
                       ],
                     ),
                   ),

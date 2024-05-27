@@ -14,6 +14,7 @@ class _HistoryPageState extends State<HistoryPage> {
   String _sortOrder = 'desc'; // Default sorting order
 
   String _formatTimestamp(dynamic timestamp) {
+    if (timestamp == null) return 'N/A';
     var date = DateTime.fromMillisecondsSinceEpoch(
         (timestamp is int ? timestamp : (timestamp as double).toInt()) * 1000);
     return DateFormat('yyyy-MM-dd HH:mm:ss').format(date);
@@ -38,7 +39,7 @@ class _HistoryPageState extends State<HistoryPage> {
       drawer: CommonDrawer(),
       body: StreamBuilder<QuerySnapshot>(
         stream: _firestore
-            .collection('exits')
+            .collection('payment')
             .orderBy('exitTime', descending: _sortOrder == 'desc')
             .snapshots(),
         builder: (context, snapshot) {
@@ -46,24 +47,31 @@ class _HistoryPageState extends State<HistoryPage> {
             return Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Error fetching exit data'));
+            return Center(child: Text('Error fetching payment data'));
           }
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return Center(child: Text('No exit records found'));
+            return Center(child: Text('No payment records found'));
           }
 
-          var exits = snapshot.data!.docs;
+          var payments = snapshot.data!.docs;
           return ListView.builder(
-            itemCount: exits.length,
+            itemCount: payments.length,
             itemBuilder: (context, index) {
-              var exit = exits[index].data() as Map<String, dynamic>;
-              var exitTime = _formatTimestamp(exit['exitTime']);
-              var parkingDuration = exit['parkingDuration'] is int
-                  ? exit['parkingDuration']
-                  : (exit['parkingDuration'] as double).toInt();
-              var parkingFee = exit['parkingFee'] is int
-                  ? exit['parkingFee']
-                  : (exit['parkingFee'] as double).toInt();
+              var payment = payments[index].data() as Map<String, dynamic>;
+
+              var vehicleId = payment['vehicleId'] ?? 'N/A';
+              var slotClass = payment['slotClass'] ?? 'N/A';
+              var exitTime = _formatTimestamp(payment['exitTime']);
+              var parkingDuration = payment['duration'] is int
+                  ? payment['duration']
+                  : (payment['duration'] is double
+                      ? (payment['duration'] as double).toInt()
+                      : 'N/A');
+              var parkingFee = payment['totalCost'] is int
+                  ? payment['totalCost']
+                  : (payment['totalCost'] is double
+                      ? (payment['totalCost'] as double).toInt()
+                      : 'N/A');
 
               return Padding(
                 padding: const EdgeInsets.all(8.0),
@@ -75,13 +83,13 @@ class _HistoryPageState extends State<HistoryPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        Text('Vehicle ID: ${exit['vehicleId']}',
+                        Text('Vehicle ID: $vehicleId',
                             style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.blue)),
                         SizedBox(height: 8),
-                        Text('Class: ${exit['class']}',
+                        Text('Class: $slotClass',
                             style: TextStyle(fontSize: 16, color: Colors.cyan)),
                         SizedBox(height: 8),
                         Text('Exit Time: $exitTime',
