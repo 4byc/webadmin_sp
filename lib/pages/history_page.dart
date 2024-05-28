@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart'; // For date formatting
+import 'package:intl/intl.dart';
 import 'package:webadmin_sp/widgets/common_drawer.dart';
 import 'package:webadmin_sp/widgets/gradient_app_bar.dart';
 
@@ -11,13 +11,118 @@ class HistoryPage extends StatefulWidget {
 
 class _HistoryPageState extends State<HistoryPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  String _sortOrder = 'desc'; // Default sorting order
+  String _sortOrder = 'desc';
 
   String _formatTimestamp(dynamic timestamp) {
     if (timestamp == null) return 'N/A';
     var date = DateTime.fromMillisecondsSinceEpoch(
         (timestamp is int ? timestamp : (timestamp as double).toInt()) * 1000);
     return DateFormat('yyyy-MM-dd HH:mm:ss').format(date);
+  }
+
+  void _editPayment(BuildContext context, String paymentId,
+      Map<String, dynamic> paymentData) {
+    var vehicleIdController =
+        TextEditingController(text: paymentData['vehicleId'].toString());
+    var slotClassController =
+        TextEditingController(text: paymentData['slotClass']);
+    var exitTimeController =
+        TextEditingController(text: _formatTimestamp(paymentData['exitTime']));
+    var durationController =
+        TextEditingController(text: paymentData['duration'].toString());
+    var totalCostController =
+        TextEditingController(text: paymentData['totalCost'].toString());
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Edit Payment Record'),
+          content: SingleChildScrollView(
+            child: Column(
+              children: [
+                TextField(
+                  controller: vehicleIdController,
+                  decoration: InputDecoration(labelText: 'Vehicle ID'),
+                ),
+                TextField(
+                  controller: slotClassController,
+                  decoration: InputDecoration(labelText: 'Class'),
+                ),
+                TextField(
+                  controller: exitTimeController,
+                  decoration: InputDecoration(labelText: 'Exit Time'),
+                ),
+                TextField(
+                  controller: durationController,
+                  decoration: InputDecoration(labelText: 'Duration'),
+                ),
+                TextField(
+                  controller: totalCostController,
+                  decoration: InputDecoration(labelText: 'Total Cost'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: Text('Save'),
+              onPressed: () async {
+                var updatedData = {
+                  'vehicleId': int.tryParse(vehicleIdController.text) ??
+                      vehicleIdController.text,
+                  'slotClass': slotClassController.text,
+                  'exitTime': DateTime.parse(exitTimeController.text)
+                      .millisecondsSinceEpoch,
+                  'duration': int.tryParse(durationController.text),
+                  'totalCost': int.tryParse(totalCostController.text),
+                };
+
+                await _firestore
+                    .collection('payment')
+                    .doc(paymentId)
+                    .update(updatedData);
+
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _confirmDelete(BuildContext context, String paymentId) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Confirm Delete'),
+          content: Text('Are you sure you want to delete this payment record?'),
+          actions: [
+            TextButton(
+              child: Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: Text('Delete'),
+              onPressed: () async {
+                await _firestore.collection('payment').doc(paymentId).delete();
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   @override
@@ -58,6 +163,7 @@ class _HistoryPageState extends State<HistoryPage> {
             itemCount: payments.length,
             itemBuilder: (context, index) {
               var payment = payments[index].data() as Map<String, dynamic>;
+              var paymentId = payments[index].id;
 
               var vehicleId = payment['vehicleId'] ?? 'N/A';
               var slotClass = payment['slotClass'] ?? 'N/A';
@@ -100,6 +206,23 @@ class _HistoryPageState extends State<HistoryPage> {
                         SizedBox(height: 8),
                         Text('Parking Fee: \$${parkingFee}',
                             style: TextStyle(fontSize: 16)),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            IconButton(
+                              icon: Icon(Icons.edit),
+                              onPressed: () {
+                                _editPayment(context, paymentId, payment);
+                              },
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.delete),
+                              onPressed: () {
+                                _confirmDelete(context, paymentId);
+                              },
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                   ),

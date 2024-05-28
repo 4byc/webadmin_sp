@@ -30,19 +30,22 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
 
   Future<void> _synchronizeParkingSlots() async {
     try {
-      // Fetch all detections
       QuerySnapshot detectionSnapshot =
           await _firestore.collection('detections').get();
+      QuerySnapshot paymentSnapshot =
+          await _firestore.collection('payment').get();
       Map<String, dynamic> detections = {};
+      Set<String> processedVehicles = paymentSnapshot.docs
+          .map((doc) => doc['vehicleId'].toString())
+          .toSet();
 
-      // Collect all detections
       for (var doc in detectionSnapshot.docs) {
         var data = doc.data() as Map<String, dynamic>;
-        print('Detection data: $data');
-        detections[data['VehicleID'].toString()] = data;
+        if (!processedVehicles.contains(data['VehicleID'].toString())) {
+          detections[data['VehicleID'].toString()] = data;
+        }
       }
 
-      // Iterate over each class
       for (var className in ['A', 'B', 'C']) {
         DocumentSnapshot parkingSlotSnapshot =
             await _firestore.collection('parkingSlots').doc(className).get();
@@ -51,7 +54,6 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
               parkingSlotSnapshot.data() as Map<String, dynamic>;
           List<dynamic> slots = parkingSlotsData['slots'] ?? [];
 
-          // Clear previous allocations
           for (var slot in slots) {
             slot['entryTime'] = null;
             slot['isFilled'] = false;
@@ -59,20 +61,17 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
             slot['slotClass'] = className;
           }
 
-          // Allocate slots to vehicles
           for (var vehicleID in detections.keys) {
             var detection = detections[vehicleID];
             if (detection['class'] == className) {
               for (var slot in slots) {
                 if (slot['isFilled'] == false) {
-                  // Ensure entryTime is stored as an integer
                   var entryTime = detection['time'] is double
                       ? detection['time'].toInt()
                       : detection['time'];
                   slot['entryTime'] = entryTime;
                   slot['isFilled'] = true;
-                  slot['vehicleId'] = int.tryParse(vehicleID) ??
-                      vehicleID; // Ensure vehicleId is stored as a number
+                  slot['vehicleId'] = int.tryParse(vehicleID) ?? vehicleID;
                   slot['slotClass'] = detection['class'];
                   break;
                 }
@@ -80,7 +79,6 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
             }
           }
 
-          // Update the slots in Firestore
           await _firestore.collection('parkingSlots').doc(className).update({
             'slots': slots,
           });

@@ -29,6 +29,19 @@ class _DashboardPageState extends State<DashboardPage> {
     return DateFormat('yyyy-MM-dd HH:mm:ss').format(date);
   }
 
+  Future<Map<String, bool>> _fetchParkingStatus() async {
+    QuerySnapshot paymentSnapshot =
+        await _firestore.collection('payment').get();
+    Map<String, bool> parkingStatus = {};
+
+    for (var doc in paymentSnapshot.docs) {
+      var data = doc.data() as Map<String, dynamic>;
+      parkingStatus[data['vehicleId'].toString()] = true; // Mark as exited
+    }
+
+    return parkingStatus;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -91,61 +104,102 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               ),
               Expanded(
-                child: StreamBuilder<QuerySnapshot>(
-                  stream: _firestore
-                      .collection('detections')
-                      .orderBy('time', descending: _sortOrder == 'desc')
-                      .snapshots(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
+                child: FutureBuilder<Map<String, bool>>(
+                  future: _fetchParkingStatus(),
+                  builder: (context, statusSnapshot) {
+                    if (statusSnapshot.connectionState ==
+                        ConnectionState.waiting) {
                       return Center(
                           child: CircularProgressIndicator(color: Colors.cyan));
                     }
-                    if (snapshot.hasError) {
+                    if (statusSnapshot.hasError) {
                       return Center(
-                          child: Text('Error fetching detections',
-                              style: TextStyle(color: Colors.red)));
-                    }
-                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                      return Center(
-                          child: Text('No detections found',
+                          child: Text('Error fetching parking status',
                               style: TextStyle(color: Colors.red)));
                     }
 
-                    var detections = snapshot.data!.docs;
-                    return ListView.builder(
-                      itemCount: detections.length,
-                      itemBuilder: (context, index) {
-                        var detection =
-                            detections[index].data() as Map<String, dynamic>;
-                        var entryTime = _formatTimestamp(detection['time']);
-                        return Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Card(
-                            elevation: 5,
-                            color: Colors.blue[50],
-                            child: Padding(
-                              padding: const EdgeInsets.all(16.0),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: <Widget>[
-                                  Text('Vehicle ID: ${detection['VehicleID']}',
-                                      style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.blue)),
-                                  SizedBox(height: 8),
-                                  Text('Class: ${detection['class']}',
-                                      style: TextStyle(
-                                          fontSize: 16, color: Colors.cyan)),
-                                  SizedBox(height: 8),
-                                  Text('Entry Time: $entryTime',
-                                      style: TextStyle(
-                                          fontSize: 16, color: Colors.cyan)),
-                                ],
-                              ),
+                    var parkingStatus = statusSnapshot.data ?? {};
+
+                    return StreamBuilder<QuerySnapshot>(
+                      stream: _firestore
+                          .collection('detections')
+                          .orderBy('time', descending: _sortOrder == 'desc')
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return Center(
+                              child: CircularProgressIndicator(
+                                  color: Colors.cyan));
+                        }
+                        if (snapshot.hasError) {
+                          return Center(
+                              child: Text('Error fetching detections',
+                                  style: TextStyle(color: Colors.red)));
+                        }
+                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                          return Center(
+                              child: Text('No detections found',
+                                  style: TextStyle(color: Colors.red)));
+                        }
+
+                        var detections = snapshot.data!.docs;
+                        var parkedVehicles = detections
+                            .where((d) =>
+                                !(parkingStatus[d['VehicleID'].toString()] ??
+                                    false))
+                            .toList();
+                        var exitedVehicles = detections
+                            .where((d) =>
+                                parkingStatus[d['VehicleID'].toString()] ??
+                                false)
+                            .toList();
+
+                        return ListView(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Text('Parked Vehicles',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.blue)),
                             ),
-                          ),
+                            ...parkedVehicles.map((detection) {
+                              var data =
+                                  detection.data() as Map<String, dynamic>;
+                              var entryTime = _formatTimestamp(data['time']);
+                              var vehicleId = data['VehicleID'].toString();
+                              return _buildDetectionCard(
+                                  context,
+                                  vehicleId,
+                                  data,
+                                  entryTime,
+                                  'Parked',
+                                  parkingStatus[vehicleId]);
+                            }).toList(),
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Text('Exited Vehicles',
+                                  style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.blue)),
+                            ),
+                            ...exitedVehicles.map((detection) {
+                              var data =
+                                  detection.data() as Map<String, dynamic>;
+                              var entryTime = _formatTimestamp(data['time']);
+                              var vehicleId = data['VehicleID'].toString();
+                              return _buildDetectionCard(
+                                  context,
+                                  vehicleId,
+                                  data,
+                                  entryTime,
+                                  'Exited',
+                                  parkingStatus[vehicleId]);
+                            }).toList(),
+                          ],
                         );
                       },
                     );
@@ -156,6 +210,152 @@ class _DashboardPageState extends State<DashboardPage> {
           );
         },
       ),
+    );
+  }
+
+  Widget _buildDetectionCard(
+      BuildContext context,
+      String vehicleId,
+      Map<String, dynamic> data,
+      String entryTime,
+      String status,
+      bool? isExited) {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Card(
+        elevation: 5,
+        color: Colors.blue[50],
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text('Vehicle ID: $vehicleId',
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue)),
+              SizedBox(height: 8),
+              Text('Class: ${data['class']}',
+                  style: TextStyle(fontSize: 16, color: Colors.cyan)),
+              SizedBox(height: 8),
+              Text('Entry Time: $entryTime',
+                  style: TextStyle(fontSize: 16, color: Colors.cyan)),
+              SizedBox(height: 8),
+              Text('Status: $status',
+                  style: TextStyle(fontSize: 16, color: Colors.cyan)),
+              SizedBox(height: 8),
+              Row(
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.edit),
+                    onPressed: () => _showEditDialog(context, vehicleId, data),
+                  ),
+                  if (status == 'Parked')
+                    IconButton(
+                      icon: Icon(Icons.delete),
+                      onPressed: () => _confirmDelete(context, vehicleId),
+                    ),
+                ],
+              )
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showEditDialog(
+      BuildContext context, String vehicleId, Map<String, dynamic> data) {
+    TextEditingController vehicleIdController =
+        TextEditingController(text: vehicleId);
+    TextEditingController classController =
+        TextEditingController(text: data['class']);
+    TextEditingController timeController =
+        TextEditingController(text: _formatTimestamp(data['time']));
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Edit Detection'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              TextField(
+                controller: vehicleIdController,
+                decoration: InputDecoration(labelText: 'Vehicle ID'),
+              ),
+              TextField(
+                controller: classController,
+                decoration: InputDecoration(labelText: 'Class'),
+              ),
+              TextField(
+                controller: timeController,
+                decoration: InputDecoration(labelText: 'Time'),
+                keyboardType: TextInputType.datetime,
+              ),
+            ],
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: Text('Save'),
+              onPressed: () async {
+                var updatedData = {
+                  'VehicleID': int.tryParse(vehicleIdController.text) ??
+                      vehicleIdController.text,
+                  'class': classController.text,
+                  'time': DateTime.parse(timeController.text)
+                      .millisecondsSinceEpoch,
+                };
+
+                await _firestore
+                    .collection('detections')
+                    .doc(vehicleId)
+                    .update(updatedData);
+
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _confirmDelete(BuildContext context, String vehicleId) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Confirm Delete'),
+          content: Text('Are you sure you want to delete this detection?'),
+          actions: <Widget>[
+            TextButton(
+              child: Text('Cancel'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: Text('Delete'),
+              onPressed: () async {
+                await _firestore
+                    .collection('detections')
+                    .doc(vehicleId)
+                    .delete();
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 }
