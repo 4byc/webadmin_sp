@@ -13,6 +13,25 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   String _sortOrder = 'desc';
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _startTimer(); // Start the timer for periodic synchronization
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel(); // Cancel the timer when disposing the widget
+    super.dispose();
+  }
+
+  void _startTimer() {
+    _timer = Timer.periodic(Duration(minutes: 5), (timer) {
+      _synchronizeParkingSlots(); // Synchronize every 5 minutes
+    });
+  }
 
   Future<Map<String, dynamic>> _fetchAdminData() async {
     final user = FirebaseAuth.instance.currentUser;
@@ -40,6 +59,102 @@ class _DashboardPageState extends State<DashboardPage> {
     }
 
     return parkingStatus;
+  }
+
+  Future<void> _synchronizeParkingSlots() async {
+    try {
+      QuerySnapshot detectionSnapshot =
+          await _firestore.collection('detections').get();
+      QuerySnapshot paymentSnapshot =
+          await _firestore.collection('payment').get();
+      Map<String, dynamic> detections = {};
+      Set<String> exitedVehicles = paymentSnapshot.docs
+          .map((doc) => doc['vehicleId'].toString())
+          .toSet();
+
+      for (var doc in detectionSnapshot.docs) {
+        var data = doc.data() as Map<String, dynamic>;
+        if (!exitedVehicles.contains(data['VehicleID'].toString())) {
+          detections[data['VehicleID'].toString()] = data;
+        }
+      }
+
+      for (var className in ['A', 'B', 'C']) {
+        DocumentSnapshot parkingSlotSnapshot =
+            await _firestore.collection('parkingSlots').doc(className).get();
+        if (parkingSlotSnapshot.exists) {
+          var parkingSlotsData =
+              parkingSlotSnapshot.data() as Map<String, dynamic>;
+          List<dynamic> slots = parkingSlotsData['slots'] ?? [];
+
+          for (var slot in slots) {
+            slot['entryTime'] = null;
+            slot['isFilled'] = false;
+            slot['vehicleId'] = null;
+            slot['slotClass'] = className;
+          }
+
+          for (var vehicleID in detections.keys) {
+            var detection = detections[vehicleID];
+            if (detection['class'] == className) {
+              for (var slot in slots) {
+                if (slot['isFilled'] == false) {
+                  var entryTime = detection['time'] is double
+                      ? detection['time'].toInt()
+                      : detection['time'];
+                  slot['entryTime'] = entryTime;
+                  slot['isFilled'] = true;
+                  slot['vehicleId'] = int.tryParse(vehicleID) ?? vehicleID;
+                  slot['slotClass'] = detection['class'];
+                  break;
+                }
+              }
+            }
+          }
+
+          await _firestore.collection('parkingSlots').doc(className).update({
+            'slots': slots,
+          });
+        }
+      }
+    } catch (e) {
+      print('Error synchronizing parking slots: $e');
+    }
+  }
+
+  Future<void> _processToParkingLot(
+      String vehicleId, Map<String, dynamic> data) async {
+    try {
+      String vehicleClass = data['class'];
+      DocumentSnapshot parkingSlotSnapshot =
+          await _firestore.collection('parkingSlots').doc(vehicleClass).get();
+      if (parkingSlotSnapshot.exists) {
+        var parkingSlotsData =
+            parkingSlotSnapshot.data() as Map<String, dynamic>;
+        List<dynamic> slots = parkingSlotsData['slots'] ?? [];
+
+        for (var slot in slots) {
+          if (slot['isFilled'] == false) {
+            var entryTime =
+                data['time'] is double ? data['time'].toInt() : data['time'];
+            slot['entryTime'] = entryTime;
+            slot['isFilled'] = true;
+            slot['vehicleId'] = int.tryParse(vehicleId) ?? vehicleId;
+            slot['slotClass'] = vehicleClass;
+            break;
+          }
+        }
+
+        await _firestore.collection('parkingSlots').doc(vehicleClass).update({
+          'slots': slots,
+        });
+
+        // Remove the detection record after processing
+        await _firestore.collection('detections').doc(vehicleId).delete();
+      }
+    } catch (e) {
+      print('Error processing to parking lot: $e');
+    }
   }
 
   @override
@@ -247,10 +362,11 @@ class _DashboardPageState extends State<DashboardPage> {
               SizedBox(height: 8),
               Row(
                 children: [
-                  IconButton(
-                    icon: Icon(Icons.edit),
-                    onPressed: () => _showEditDialog(context, vehicleId, data),
-                  ),
+                  if (status == 'Parked')
+                    IconButton(
+                      icon: Icon(Icons.drive_eta),
+                      onPressed: () => _processToParkingLot(vehicleId, data),
+                    ),
                   if (status == 'Parked')
                     IconButton(
                       icon: Icon(Icons.delete),
@@ -262,70 +378,6 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
         ),
       ),
-    );
-  }
-
-  void _showEditDialog(
-      BuildContext context, String vehicleId, Map<String, dynamic> data) {
-    TextEditingController vehicleIdController =
-        TextEditingController(text: vehicleId);
-    TextEditingController classController =
-        TextEditingController(text: data['class']);
-    TextEditingController timeController =
-        TextEditingController(text: _formatTimestamp(data['time']));
-
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text('Edit Detection'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              TextField(
-                controller: vehicleIdController,
-                decoration: InputDecoration(labelText: 'Vehicle ID'),
-              ),
-              TextField(
-                controller: classController,
-                decoration: InputDecoration(labelText: 'Class'),
-              ),
-              TextField(
-                controller: timeController,
-                decoration: InputDecoration(labelText: 'Time'),
-                keyboardType: TextInputType.datetime,
-              ),
-            ],
-          ),
-          actions: <Widget>[
-            TextButton(
-              child: Text('Cancel'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-            TextButton(
-              child: Text('Save'),
-              onPressed: () async {
-                var updatedData = {
-                  'VehicleID': int.tryParse(vehicleIdController.text) ??
-                      vehicleIdController.text,
-                  'class': classController.text,
-                  'time': DateTime.parse(timeController.text)
-                      .millisecondsSinceEpoch,
-                };
-
-                await _firestore
-                    .collection('detections')
-                    .doc(vehicleId)
-                    .update(updatedData);
-
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
-        );
-      },
     );
   }
 

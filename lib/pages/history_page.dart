@@ -204,7 +204,7 @@ class _HistoryPageState extends State<HistoryPage> {
                         Text('Parking Duration: $parkingDuration seconds',
                             style: TextStyle(fontSize: 16)),
                         SizedBox(height: 8),
-                        Text('Parking Fee: \$${parkingFee}',
+                        Text('Parking Fee: \Rp ${parkingFee}',
                             style: TextStyle(fontSize: 16)),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
