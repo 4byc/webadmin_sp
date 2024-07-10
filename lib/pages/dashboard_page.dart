@@ -360,20 +360,6 @@ class _DashboardPageState extends State<DashboardPage> {
               Text('Status: $status',
                   style: TextStyle(fontSize: 16, color: Colors.cyan)),
               SizedBox(height: 8),
-              Row(
-                children: [
-                  if (status == 'Parked')
-                    IconButton(
-                      icon: Icon(Icons.drive_eta),
-                      onPressed: () => _processToParkingLot(vehicleId, data),
-                    ),
-                  if (status == 'Parked')
-                    IconButton(
-                      icon: Icon(Icons.delete),
-                      onPressed: () => _confirmDelete(context, vehicleId),
-                    ),
-                ],
-              )
             ],
           ),
         ),
