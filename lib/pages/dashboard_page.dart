@@ -149,7 +149,7 @@ class _DashboardPageState extends State<DashboardPage> {
           'slots': slots,
         });
 
-        // Remove the detection record after processing
+        // Hapus catatan deteksi setelah diproses
         await _firestore.collection('detections').doc(vehicleId).delete();
       }
     } catch (e) {
