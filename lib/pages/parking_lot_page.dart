@@ -15,6 +15,7 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
   String _sortOrder = 'asc'; // Default sorting order
   String _filter = 'All'; // Default filter
 
+  // Format Firestore timestamp to readable string
   String _formatTimestamp(dynamic timestamp) {
     if (timestamp == null) return 'N/A';
     var date = DateTime.fromMillisecondsSinceEpoch(
@@ -22,10 +23,12 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
     return DateFormat('yyyy-MM-dd HH:mm:ss').format(date);
   }
 
+  // Get a stream of parking slots for the selected class
   Stream<DocumentSnapshot> _getParkingSlotStream(String className) {
     return _firestore.collection('parkingSlots').doc(className).snapshots();
   }
 
+  // Filter parking slots based on the selected filter
   List<dynamic> _filterSlots(List<dynamic> slots) {
     if (_filter == 'Filled') {
       return slots.where((slot) => slot['isFilled'] == true).toList();
@@ -35,6 +38,7 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
     return slots;
   }
 
+  // Remove duplicate slots from the list
   List<dynamic> _removeDuplicateSlots(List<dynamic> slots) {
     var uniqueSlots = <String, dynamic>{};
     for (var slot in slots) {
@@ -43,6 +47,7 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
     return uniqueSlots.values.toList();
   }
 
+  // Sort the slots based on the selected sorting order
   List<dynamic> _sortSlots(List<dynamic> slots) {
     slots.sort((a, b) {
       var idA =
@@ -54,6 +59,7 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
     return slots;
   }
 
+  // Show details of the selected parking slot
   void _showSlotDetails(Map<String, dynamic> slot) {
     showDialog(
       context: context,
@@ -89,6 +95,7 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
       appBar: GradientAppBar(
         title: 'Parking Lot',
         actions: <Widget>[
+          // Dropdown menu for class selection
           DropdownButton<String>(
             value: _selectedClass,
             dropdownColor: Colors.blue,
@@ -108,6 +115,7 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
               );
             }).toList(),
           ),
+          // Icon button for sorting order
           IconButton(
             icon: Icon(
               _sortOrder == 'asc' ? Icons.arrow_upward : Icons.arrow_downward,
@@ -119,6 +127,7 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
               });
             },
           ),
+          // Popup menu for filtering slots
           PopupMenuButton<String>(
             icon: Icon(Icons.filter_list, color: Colors.white),
             onSelected: (String result) {
