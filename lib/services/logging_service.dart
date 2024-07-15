@@ -1,6 +1,6 @@
-// logging_service.dart
 import 'package:logger/logger.dart';
 
+// Initialize a global logger instance
 final Logger logger = Logger(
-  printer: PrettyPrinter(),
+  printer: PrettyPrinter(), // Use PrettyPrinter for well-formatted logs
 );

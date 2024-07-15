@@ -13,6 +13,7 @@ class _HistoryPageState extends State<HistoryPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   String _sortOrder = 'desc';
 
+  // Format Firestore timestamp to readable string
   String _formatTimestamp(dynamic timestamp) {
     if (timestamp == null) return 'N/A';
     var date = DateTime.fromMillisecondsSinceEpoch(
@@ -20,6 +21,7 @@ class _HistoryPageState extends State<HistoryPage> {
     return DateFormat('yyyy-MM-dd HH:mm:ss').format(date);
   }
 
+  // Edit payment record dialog
   void _editPayment(BuildContext context, String paymentId,
       Map<String, dynamic> paymentData) {
     var vehicleIdController =
@@ -98,6 +100,7 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
+  // Confirm delete payment record dialog
   void _confirmDelete(BuildContext context, String paymentId) {
     showDialog(
       context: context,
