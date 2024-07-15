@@ -27,12 +27,14 @@ class _DashboardPageState extends State<DashboardPage> {
     super.dispose();
   }
 
+  // Start a timer to synchronize parking slots every 5 minutes
   void _startTimer() {
     _timer = Timer.periodic(Duration(minutes: 5), (timer) {
       _synchronizeParkingSlots(); // Synchronize every 5 minutes
     });
   }
 
+  // Fetch admin data from Firestore
   Future<Map<String, dynamic>> _fetchAdminData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
@@ -42,12 +44,14 @@ class _DashboardPageState extends State<DashboardPage> {
     return {};
   }
 
+  // Format Firestore timestamp to readable string
   String _formatTimestamp(dynamic timestamp) {
     var date = DateTime.fromMillisecondsSinceEpoch(
         (timestamp is int ? timestamp : (timestamp as double).toInt()) * 1000);
     return DateFormat('yyyy-MM-dd HH:mm:ss').format(date);
   }
 
+  // Fetch parking status from Firestore
   Future<Map<String, bool>> _fetchParkingStatus() async {
     QuerySnapshot paymentSnapshot =
         await _firestore.collection('payment').get();
@@ -61,6 +65,7 @@ class _DashboardPageState extends State<DashboardPage> {
     return parkingStatus;
   }
 
+  // Synchronize parking slots with detections data from Firestore
   Future<void> _synchronizeParkingSlots() async {
     try {
       QuerySnapshot detectionSnapshot =
@@ -122,6 +127,7 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  // Process vehicle data to parking lot
   Future<void> _processToParkingLot(
       int vehicleId, Map<String, dynamic> data) async {
     try {
@@ -149,7 +155,7 @@ class _DashboardPageState extends State<DashboardPage> {
           'slots': slots,
         });
 
-        // Hapus catatan deteksi setelah diproses
+        // Remove detection record after processing
         await _firestore
             .collection('detections')
             .doc(vehicleId.toString())
@@ -331,6 +337,7 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+  // Build detection card widget for parked and exited vehicles
   Widget _buildDetectionCard(
       BuildContext context,
       String vehicleId,
@@ -370,6 +377,7 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
+  // Confirm deletion of a detection record
   void _confirmDelete(BuildContext context, String vehicleId) {
     showDialog(
       context: context,
@@ -424,6 +432,7 @@ class _RealTimeClockState extends State<RealTimeClock> {
     super.dispose();
   }
 
+  // Update the current time and date every second
   void _updateTime() {
     setState(() {
       _currentTime = _formatCurrentTime();
@@ -431,10 +440,12 @@ class _RealTimeClockState extends State<RealTimeClock> {
     });
   }
 
+  // Format the current time to HH:mm:ss
   String _formatCurrentTime() {
     return DateFormat('HH:mm:ss').format(DateTime.now());
   }
 
+  // Format the current date to EEEE, dd MMMM yyyy
   String _formatCurrentDate() {
     return DateFormat('EEEE, dd MMMM yyyy').format(DateTime.now());
   }
