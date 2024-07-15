@@ -67,15 +67,15 @@ class _DashboardPageState extends State<DashboardPage> {
           await _firestore.collection('detections').get();
       QuerySnapshot paymentSnapshot =
           await _firestore.collection('payment').get();
-      Map<String, dynamic> detections = {};
-      Set<String> exitedVehicles = paymentSnapshot.docs
-          .map((doc) => doc['vehicleId'].toString())
-          .toSet();
+      Map<int, dynamic> detections = {};
+      Set<int> exitedVehicles =
+          paymentSnapshot.docs.map((doc) => doc['vehicleId'] as int).toSet();
 
       for (var doc in detectionSnapshot.docs) {
         var data = doc.data() as Map<String, dynamic>;
-        if (!exitedVehicles.contains(data['VehicleID'].toString())) {
-          detections[data['VehicleID'].toString()] = data;
+        int vehicleID = int.parse(data['VehicleID'].toString());
+        if (!exitedVehicles.contains(vehicleID)) {
+          detections[vehicleID] = data;
         }
       }
 
@@ -104,7 +104,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       : detection['time'];
                   slot['entryTime'] = entryTime;
                   slot['isFilled'] = true;
-                  slot['vehicleId'] = int.tryParse(vehicleID) ?? vehicleID;
+                  slot['vehicleId'] = vehicleID;
                   slot['slotClass'] = detection['class'];
                   break;
                 }
@@ -123,7 +123,7 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _processToParkingLot(
-      String vehicleId, Map<String, dynamic> data) async {
+      int vehicleId, Map<String, dynamic> data) async {
     try {
       String vehicleClass = data['class'];
       DocumentSnapshot parkingSlotSnapshot =
@@ -139,7 +139,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 data['time'] is double ? data['time'].toInt() : data['time'];
             slot['entryTime'] = entryTime;
             slot['isFilled'] = true;
-            slot['vehicleId'] = int.tryParse(vehicleId) ?? vehicleId;
+            slot['vehicleId'] = vehicleId;
             slot['slotClass'] = vehicleClass;
             break;
           }
@@ -150,7 +150,10 @@ class _DashboardPageState extends State<DashboardPage> {
         });
 
         // Hapus catatan deteksi setelah diproses
-        await _firestore.collection('detections').doc(vehicleId).delete();
+        await _firestore
+            .collection('detections')
+            .doc(vehicleId.toString())
+            .delete();
       }
     } catch (e) {
       print('Error processing to parking lot: $e');
