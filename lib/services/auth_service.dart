@@ -5,7 +5,6 @@ class AuthService {
   final FirebaseAuth _firebaseAuth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Sign in with email and password
   Future<User?> signIn(String email, String password) async {
     try {
       UserCredential userCredential =
@@ -32,12 +31,10 @@ class AuthService {
     }
   }
 
-  // Sign out the current user
   Future<void> signOut() async {
     await _firebaseAuth.signOut();
   }
 
-  // Start listening for detections in Firestore
   void startListeningForDetections() {
     _firestore.collection('detections').snapshots().listen((snapshot) {
       for (var doc in snapshot.docs) {
@@ -47,7 +44,6 @@ class AuthService {
     });
   }
 
-  // Update parking slot based on detection data
   Future<void> _updateParkingSlot(Map<String, dynamic> detection) async {
     try {
       String vehicleId = detection['VehicleID'].toString();

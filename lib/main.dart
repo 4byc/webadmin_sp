@@ -9,7 +9,6 @@ import 'package:webadmin_sp/providers/auth_provider.dart'
     as local_auth_provider;
 import 'firebase_options.dart';
 
-// Main function to initialize the application
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
@@ -25,24 +24,21 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        // Initialize AuthProvider for authentication management
         ChangeNotifierProvider(
-          create: (_) => local_auth_provider.AuthProvider(),
-        ),
+            create: (_) => local_auth_provider.AuthProvider()),
       ],
       child: MaterialApp(
         title: 'Smart Parking Admin',
         theme: ThemeData(
           primarySwatch: Colors.blue,
           scaffoldBackgroundColor: Colors.white,
-          textTheme: const TextTheme(
+          textTheme: TextTheme(
             bodyLarge: TextStyle(color: Colors.black),
             bodyMedium: TextStyle(color: Colors.black),
           ),
         ),
         initialRoute: '/',
         debugShowCheckedModeBanner: false,
-        // Define the routes of the application
         routes: {
           '/': (context) => LoginPage(),
           '/dashboard': (context) => DashboardPage(),
