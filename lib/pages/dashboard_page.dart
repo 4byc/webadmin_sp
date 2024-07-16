@@ -13,25 +13,10 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   String _sortOrder = 'desc';
-  Timer? _timer;
 
   @override
   void initState() {
     super.initState();
-    _startTimer(); // Start the timer for periodic synchronization
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel(); // Cancel the timer when disposing the widget
-    super.dispose();
-  }
-
-  // Start a timer to synchronize parking slots every 5 minutes
-  void _startTimer() {
-    _timer = Timer.periodic(Duration(minutes: 5), (timer) {
-      _synchronizeParkingSlots(); // Synchronize every 5 minutes
-    });
   }
 
   // Fetch admin data from Firestore
@@ -65,7 +50,7 @@ class _DashboardPageState extends State<DashboardPage> {
     return parkingStatus;
   }
 
-  // Synchronize parking slots with detections data from Firestore
+  // Manual synchronization of parking slots with detections data from Firestore
   Future<void> _synchronizeParkingSlots() async {
     try {
       QuerySnapshot detectionSnapshot =
@@ -227,6 +212,10 @@ class _DashboardPageState extends State<DashboardPage> {
                   ],
                 ),
               ),
+              ElevatedButton(
+                onPressed: _synchronizeParkingSlots,
+                child: Text('Synchronize Parking Slots'),
+              ),
               Expanded(
                 child: FutureBuilder<Map<String, bool>>(
                   future: _fetchParkingStatus(),
@@ -374,37 +363,6 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
         ),
       ),
-    );
-  }
-
-  // Confirm deletion of a detection record
-  void _confirmDelete(BuildContext context, String vehicleId) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text('Confirm Delete'),
-          content: Text('Are you sure you want to delete this detection?'),
-          actions: <Widget>[
-            TextButton(
-              child: Text('Cancel'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-            ),
-            TextButton(
-              child: Text('Delete'),
-              onPressed: () async {
-                await _firestore
-                    .collection('detections')
-                    .doc(vehicleId)
-                    .delete();
-                Navigator.of(context).pop();
-              },
-            ),
-          ],
-        );
-      },
     );
   }
 }

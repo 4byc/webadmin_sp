@@ -61,6 +61,8 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
 
   // Show details of the selected parking slot
   void _showSlotDetails(Map<String, dynamic> slot) {
+    TextEditingController slotIdController = TextEditingController();
+
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -74,9 +76,22 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
               Text('Class: ${slot['slotClass'] ?? 'N/A'}'),
               Text('Entry Time: ${_formatTimestamp(slot['entryTime'])}'),
               Text('Is Filled: ${slot['isFilled'] ? 'Yes' : 'No'}'),
+              TextField(
+                controller: slotIdController,
+                decoration: InputDecoration(
+                  labelText: 'New Slot ID',
+                ),
+              ),
             ],
           ),
           actions: <Widget>[
+            TextButton(
+              child: Text('Move'),
+              onPressed: () {
+                _moveSlotData(slot['id'], slotIdController.text);
+                Navigator.of(context).pop();
+              },
+            ),
             TextButton(
               child: Text('Close'),
               onPressed: () {
@@ -87,6 +102,36 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
         );
       },
     );
+  }
+
+  // Move data from one slot to another
+  Future<void> _moveSlotData(String oldSlotId, String newSlotId) async {
+    var classDoc = _firestore.collection('parkingSlots').doc(_selectedClass);
+    var snapshot = await classDoc.get();
+
+    if (snapshot.exists) {
+      var data = snapshot.data() as Map<String, dynamic>;
+      var slots = data['slots'] as List<dynamic>;
+
+      var oldSlot = slots.firstWhere((slot) => slot['id'] == oldSlotId,
+          orElse: () => null);
+      var newSlot = slots.firstWhere((slot) => slot['id'] == newSlotId,
+          orElse: () => null);
+
+      if (oldSlot != null && newSlot != null) {
+        newSlot['vehicleId'] = oldSlot['vehicleId'];
+        newSlot['slotClass'] = oldSlot['slotClass'];
+        newSlot['entryTime'] = oldSlot['entryTime'];
+        newSlot['isFilled'] = oldSlot['isFilled'];
+
+        oldSlot['vehicleId'] = null;
+        oldSlot['slotClass'] = null;
+        oldSlot['entryTime'] = null;
+        oldSlot['isFilled'] = false;
+
+        await classDoc.update({'slots': slots});
+      }
+    }
   }
 
   @override
