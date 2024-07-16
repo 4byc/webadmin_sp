@@ -34,6 +34,8 @@ class _HistoryPageState extends State<HistoryPage> {
         TextEditingController(text: paymentData['duration'].toString());
     var totalCostController =
         TextEditingController(text: paymentData['totalCost'].toString());
+    var fineController =
+        TextEditingController(text: paymentData['fine'].toString());
 
     showDialog(
       context: context,
@@ -63,6 +65,10 @@ class _HistoryPageState extends State<HistoryPage> {
                   controller: totalCostController,
                   decoration: InputDecoration(labelText: 'Total Cost'),
                 ),
+                TextField(
+                  controller: fineController,
+                  decoration: InputDecoration(labelText: 'Fine'),
+                ),
               ],
             ),
           ),
@@ -84,6 +90,7 @@ class _HistoryPageState extends State<HistoryPage> {
                       .millisecondsSinceEpoch,
                   'duration': int.tryParse(durationController.text),
                   'totalCost': int.tryParse(totalCostController.text),
+                  'fine': int.tryParse(fineController.text),
                 };
 
                 await _firestore
@@ -181,6 +188,8 @@ class _HistoryPageState extends State<HistoryPage> {
                   : (payment['totalCost'] is double
                       ? (payment['totalCost'] as double).toInt()
                       : 'N/A');
+              var fine = payment['fine'] ?? 0;
+              var finalAmount = parkingFee + fine;
 
               return Padding(
                 padding: const EdgeInsets.all(8.0),
@@ -209,6 +218,13 @@ class _HistoryPageState extends State<HistoryPage> {
                         SizedBox(height: 8),
                         Text('Parking Fee: \Rp ${parkingFee}',
                             style: TextStyle(fontSize: 16)),
+                        SizedBox(height: 8),
+                        Text('Fine: \Rp ${fine}',
+                            style: TextStyle(fontSize: 16, color: Colors.red)),
+                        SizedBox(height: 8),
+                        Text('Total Amount: \Rp ${finalAmount}',
+                            style: TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold)),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [

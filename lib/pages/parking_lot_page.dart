@@ -62,6 +62,7 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
   // Show details of the selected parking slot
   void _showSlotDetails(Map<String, dynamic> slot) {
     TextEditingController slotIdController = TextEditingController();
+    TextEditingController messageController = TextEditingController();
 
     showDialog(
       context: context,
@@ -82,9 +83,23 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
                   labelText: 'New Slot ID',
                 ),
               ),
+              TextField(
+                controller: messageController,
+                decoration: InputDecoration(
+                  labelText: 'Message to User',
+                ),
+              ),
             ],
           ),
           actions: <Widget>[
+            TextButton(
+              child: Text('Send Message'),
+              onPressed: () {
+                _sendMessageToUser(
+                    slot['vehicleId'].toString(), messageController.text);
+                Navigator.of(context).pop();
+              },
+            ),
             TextButton(
               child: Text('Move'),
               onPressed: () {
@@ -104,7 +119,7 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
     );
   }
 
-  // Move data from one slot to another
+  // Move data from one slot to another and impose fine
   Future<void> _moveSlotData(String oldSlotId, String newSlotId) async {
     var classDoc = _firestore.collection('parkingSlots').doc(_selectedClass);
     var snapshot = await classDoc.get();
@@ -119,6 +134,15 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
           orElse: () => null);
 
       if (oldSlot != null && newSlot != null) {
+        // Check if the user violated parking rules
+        bool violated = oldSlot['vehicleId'] != null &&
+            oldSlot['slotClass'] != newSlot['slotClass'];
+        int fine = 0;
+        if (violated) {
+          fine = _calculateFine(oldSlot['slotClass'], newSlot['slotClass']);
+          _sendFineToUser(oldSlot['vehicleId'].toString(), fine);
+        }
+
         newSlot['vehicleId'] = oldSlot['vehicleId'];
         newSlot['slotClass'] = oldSlot['slotClass'];
         newSlot['entryTime'] = oldSlot['entryTime'];
@@ -131,6 +155,44 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
 
         await classDoc.update({'slots': slots});
       }
+    }
+  }
+
+  int _calculateFine(String oldClass, String newClass) {
+    // Fine calculation logic based on parking rules
+    int fineAmount = 0;
+    if (oldClass != newClass) {
+      switch (newClass) {
+        case 'A':
+          fineAmount = 15000 * 24;
+          break;
+        case 'B':
+          fineAmount = 10000 * 24;
+          break;
+        case 'C':
+          fineAmount = 5000 * 24;
+          break;
+        default:
+          fineAmount = 0;
+      }
+    }
+    return fineAmount;
+  }
+
+  Future<void> _sendFineToUser(String vehicleId, int fine) async {
+    var userDoc = _firestore.collection('fines').doc(vehicleId);
+    await userDoc.set({
+      'fine': fine,
+    }, SetOptions(merge: true));
+  }
+
+  // Send a message to the user
+  Future<void> _sendMessageToUser(String vehicleId, String message) async {
+    if (vehicleId.isNotEmpty) {
+      var userDoc = _firestore.collection('users').doc(vehicleId);
+      await userDoc.set({
+        'message': message,
+      }, SetOptions(merge: true));
     }
   }
 
