@@ -196,7 +196,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 child: StreamBuilder<QuerySnapshot>(
                   stream: _firestore
                       .collection('detections')
-                      .orderBy('time', descending: true)
+                      .orderBy('time', descending: _sortOrder == 'desc')
                       .snapshots(),
                   builder: (context, snapshot) {
                     if (snapshot.connectionState == ConnectionState.waiting) {
