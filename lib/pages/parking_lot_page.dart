@@ -11,11 +11,10 @@ class ParkingLotPage extends StatefulWidget {
 
 class _ParkingLotPageState extends State<ParkingLotPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  String _selectedClass = 'A'; // Default class selection
-  String _sortOrder = 'asc'; // Default sorting order
-  String _filter = 'All'; // Default filter
+  String _selectedClass = 'A';
+  String _sortOrder = 'asc';
+  String _filter = 'All';
 
-  // Format Firestore timestamp to readable string
   String _formatTimestamp(dynamic timestamp) {
     if (timestamp == null) return 'N/A';
     var date = DateTime.fromMillisecondsSinceEpoch(
@@ -23,12 +22,10 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
     return DateFormat('yyyy-MM-dd HH:mm:ss').format(date);
   }
 
-  // Get a stream of parking slots for the selected class
   Stream<DocumentSnapshot> _getParkingSlotStream(String className) {
     return _firestore.collection('parkingSlots').doc(className).snapshots();
   }
 
-  // Filter parking slots based on the selected filter
   List<dynamic> _filterSlots(List<dynamic> slots) {
     if (_filter == 'Filled') {
       return slots.where((slot) => slot['isFilled'] == true).toList();
@@ -38,7 +35,6 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
     return slots;
   }
 
-  // Remove duplicate slots from the list
   List<dynamic> _removeDuplicateSlots(List<dynamic> slots) {
     var uniqueSlots = <String, dynamic>{};
     for (var slot in slots) {
@@ -47,7 +43,6 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
     return uniqueSlots.values.toList();
   }
 
-  // Sort the slots based on the selected sorting order
   List<dynamic> _sortSlots(List<dynamic> slots) {
     slots.sort((a, b) {
       var idA =
@@ -59,7 +54,6 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
     return slots;
   }
 
-  // Show details of the selected parking slot
   void _showSlotDetails(Map<String, dynamic> slot) {
     TextEditingController slotIdController = TextEditingController();
     TextEditingController messageController = TextEditingController();
@@ -119,7 +113,6 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
     );
   }
 
-  // Move data from one slot to another and impose fine
   Future<void> _moveSlotData(String oldSlotId, String newSlotId) async {
     var classDoc = _firestore.collection('parkingSlots').doc(_selectedClass);
     var snapshot = await classDoc.get();
@@ -134,7 +127,6 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
           orElse: () => null);
 
       if (oldSlot != null && newSlot != null) {
-        // Check if the user violated parking rules
         bool violated = oldSlot['vehicleId'] != null &&
             oldSlot['slotClass'] != newSlot['slotClass'];
         int fine = 0;
@@ -159,7 +151,6 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
   }
 
   int _calculateFine(String oldClass, String newClass) {
-    // Fine calculation logic based on parking rules
     int fineAmount = 0;
     if (oldClass != newClass) {
       switch (newClass) {
@@ -186,7 +177,6 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
     }, SetOptions(merge: true));
   }
 
-  // Send a message to the user
   Future<void> _sendMessageToUser(String vehicleId, String message) async {
     if (vehicleId.isNotEmpty) {
       var userDoc = _firestore.collection('users').doc(vehicleId);
@@ -196,13 +186,83 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
     }
   }
 
+  Future<void> processPendingVehicles() async {
+    final QuerySnapshot pendingSnapshot =
+        await _firestore.collection('pendingVehicles').get();
+    for (final doc in pendingSnapshot.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final vehicleId = data['vehicleId'];
+      final slotClass = data['class'];
+      final entryTime = data['time'];
+
+      final DocumentSnapshot slotSnapshot =
+          await _firestore.collection('parkingSlots').doc(slotClass).get();
+      if (slotSnapshot.exists) {
+        final slotData = slotSnapshot.data() as Map<String, dynamic>;
+        final slots = slotData['slots'] as List<dynamic>;
+
+        final availableSlot = slots.firstWhere(
+          (slot) => slot['isFilled'] == false,
+          orElse: () => null,
+        );
+
+        if (availableSlot != null) {
+          availableSlot['vehicleId'] = vehicleId;
+          availableSlot['entryTime'] = entryTime;
+          availableSlot['isFilled'] = true;
+
+          await _firestore
+              .collection('parkingSlots')
+              .doc(slotClass)
+              .update({'slots': slots});
+          await _firestore.collection('pendingVehicles').doc(doc.id).delete();
+        } else {
+          var exitTime = DateTime.now().millisecondsSinceEpoch;
+          await _firestore.collection('canceledVehicles').add({
+            'vehicleId': vehicleId,
+            'class': slotClass,
+            'time': entryTime,
+          });
+          await _firestore.collection('payment').add({
+            'vehicleId': vehicleId,
+            'slotClass': slotClass,
+            'entryTime': entryTime,
+            'exitTime': exitTime,
+            'duration': 0,
+            'totalCost': 0,
+            'fine': 0,
+            'finalAmount': 0,
+            'status': 'Canceled'
+          });
+        }
+      } else {
+        var exitTime = DateTime.now().millisecondsSinceEpoch;
+        await _firestore.collection('canceledVehicles').add({
+          'vehicleId': vehicleId,
+          'class': slotClass,
+          'time': entryTime,
+        });
+        await _firestore.collection('payment').add({
+          'vehicleId': vehicleId,
+          'slotClass': slotClass,
+          'entryTime': entryTime,
+          'exitTime': exitTime,
+          'duration': 0,
+          'totalCost': 0,
+          'fine': 0,
+          'finalAmount': 0,
+          'status': 'Canceled'
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: GradientAppBar(
         title: 'Parking Lot',
         actions: <Widget>[
-          // Dropdown menu for class selection
           DropdownButton<String>(
             value: _selectedClass,
             dropdownColor: Colors.blue,
@@ -222,7 +282,6 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
               );
             }).toList(),
           ),
-          // Icon button for sorting order
           IconButton(
             icon: Icon(
               _sortOrder == 'asc' ? Icons.arrow_upward : Icons.arrow_downward,
@@ -234,7 +293,6 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
               });
             },
           ),
-          // Popup menu for filtering slots
           PopupMenuButton<String>(
             icon: Icon(Icons.filter_list, color: Colors.white),
             onSelected: (String result) {

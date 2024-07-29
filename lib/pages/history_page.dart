@@ -13,7 +13,6 @@ class _HistoryPageState extends State<HistoryPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   String _sortOrder = 'desc';
 
-  // Format Firestore timestamp to readable string
   String _formatTimestamp(dynamic timestamp) {
     if (timestamp == null) return 'N/A';
     var date = DateTime.fromMillisecondsSinceEpoch(
@@ -21,9 +20,8 @@ class _HistoryPageState extends State<HistoryPage> {
     return DateFormat('yyyy-MM-dd HH:mm:ss').format(date);
   }
 
-  // Edit payment record dialog
   void _editPayment(BuildContext context, String paymentId,
-      Map<String, dynamic> paymentData) {
+      Map<String, dynamic> paymentData, String collection) {
     var vehicleIdController =
         TextEditingController(text: paymentData['vehicleId'].toString());
     var slotClassController =
@@ -94,7 +92,7 @@ class _HistoryPageState extends State<HistoryPage> {
                 };
 
                 await _firestore
-                    .collection('payment')
+                    .collection(collection)
                     .doc(paymentId)
                     .update(updatedData);
 
@@ -107,8 +105,8 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  // Confirm delete payment record dialog
-  void _confirmDelete(BuildContext context, String paymentId) {
+  void _confirmDelete(
+      BuildContext context, String paymentId, String collection) {
     showDialog(
       context: context,
       builder: (context) {
@@ -125,7 +123,7 @@ class _HistoryPageState extends State<HistoryPage> {
             TextButton(
               child: Text('Delete'),
               onPressed: () async {
-                await _firestore.collection('payment').doc(paymentId).delete();
+                await _firestore.collection(collection).doc(paymentId).delete();
                 Navigator.of(context).pop();
               },
             ),
@@ -231,13 +229,14 @@ class _HistoryPageState extends State<HistoryPage> {
                             IconButton(
                               icon: Icon(Icons.edit),
                               onPressed: () {
-                                _editPayment(context, paymentId, payment);
+                                _editPayment(
+                                    context, paymentId, payment, 'payment');
                               },
                             ),
                             IconButton(
                               icon: Icon(Icons.delete),
                               onPressed: () {
-                                _confirmDelete(context, paymentId);
+                                _confirmDelete(context, paymentId, 'payment');
                               },
                             ),
                           ],

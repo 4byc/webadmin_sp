@@ -10,28 +10,33 @@ class DashboardPage extends StatefulWidget {
   _DashboardPageState createState() => _DashboardPageState();
 }
 
-class _DashboardPageState extends State<DashboardPage> {
+class _DashboardPageState extends State<DashboardPage>
+    with SingleTickerProviderStateMixin {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   String _sortOrder = 'desc';
   late StreamSubscription<QuerySnapshot> _detectionSubscription;
   late StreamSubscription<QuerySnapshot> _paymentSubscription;
   Map<String, bool> parkingStatus = {};
+  late TabController _tabController;
+  Map<String, bool> fullSlotsStatus = {'A': false, 'B': false, 'C': false};
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 3, vsync: this);
     _startListeningToDetections();
     _startListeningToPayments();
+    _processPendingVehicles();
   }
 
   @override
   void dispose() {
+    _tabController.dispose();
     _detectionSubscription.cancel();
     _paymentSubscription.cancel();
     super.dispose();
   }
 
-  // Fetch admin data from Firestore
   Future<Map<String, dynamic>> _fetchAdminData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
@@ -41,14 +46,12 @@ class _DashboardPageState extends State<DashboardPage> {
     return {};
   }
 
-  // Format Firestore timestamp to readable string
   String _formatTimestamp(dynamic timestamp) {
     var date = DateTime.fromMillisecondsSinceEpoch(
         (timestamp is int ? timestamp : (timestamp as double).toInt()) * 1000);
     return DateFormat('yyyy-MM-dd HH:mm:ss').format(date);
   }
 
-  // Start listening to detections collection for real-time updates
   void _startListeningToDetections() {
     _detectionSubscription =
         _firestore.collection('detections').snapshots().listen((snapshot) {
@@ -56,7 +59,6 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
-  // Start listening to payments collection for real-time updates
   void _startListeningToPayments() {
     _paymentSubscription =
         _firestore.collection('payment').snapshots().listen((snapshot) {
@@ -64,13 +66,12 @@ class _DashboardPageState extends State<DashboardPage> {
         parkingStatus = {};
         for (var doc in snapshot.docs) {
           var data = doc.data() as Map<String, dynamic>;
-          parkingStatus[data['vehicleId'].toString()] = true; // Mark as exited
+          parkingStatus[data['vehicleId'].toString()] = true;
         }
       });
     });
   }
 
-  // Synchronize parking slots with detections data from Firestore
   Future<void> _synchronizeParkingSlots(
       List<QueryDocumentSnapshot> detectionDocs) async {
     try {
@@ -95,6 +96,7 @@ class _DashboardPageState extends State<DashboardPage> {
           var parkingSlotsData =
               parkingSlotSnapshot.data() as Map<String, dynamic>;
           List<dynamic> slots = parkingSlotsData['slots'] ?? [];
+          bool isFull = true;
 
           for (var slot in slots) {
             slot['entryTime'] = null;
@@ -106,6 +108,7 @@ class _DashboardPageState extends State<DashboardPage> {
           for (var vehicleID in detections.keys) {
             var detection = detections[vehicleID];
             if (detection['class'] == className) {
+              bool parked = false;
               for (var slot in slots) {
                 if (slot['isFilled'] == false) {
                   var entryTime = detection['time'] is double
@@ -115,20 +118,99 @@ class _DashboardPageState extends State<DashboardPage> {
                   slot['isFilled'] = true;
                   slot['vehicleId'] = vehicleID;
                   slot['slotClass'] = detection['class'];
+                  parked = true;
                   break;
                 }
+              }
+              if (!parked) {
+                await _handleVehicleFull(
+                    className, vehicleID, detection['time']);
               }
             }
           }
 
+          isFull = slots.every((slot) => slot['isFilled'] == true);
+          fullSlotsStatus[className] = isFull;
           await _firestore.collection('parkingSlots').doc(className).update({
             'slots': slots,
+            'isFull': isFull,
           });
         }
       }
+
+      _processPendingVehicles();
     } catch (e) {
       print('Error synchronizing parking slots: $e');
     }
+  }
+
+  Future<void> _handleVehicleFull(
+      String slotClass, int vehicleId, int entryTime) async {
+    var exitTime = DateTime.now().millisecondsSinceEpoch;
+    await _firestore.collection('canceledVehicles').add({
+      'vehicleId': vehicleId,
+      'class': slotClass,
+      'time': entryTime,
+    });
+    await _firestore.collection('payment').add({
+      'vehicleId': vehicleId,
+      'slotClass': slotClass,
+      'entryTime': entryTime,
+      'exitTime': exitTime,
+      'duration': 0,
+      'totalCost': 0,
+      'fine': 0,
+      'finalAmount': 0,
+      'status': 'Canceled'
+    });
+
+    // Notify user to turn back
+    _notifyUserVehicleFull(slotClass);
+  }
+
+  Future<void> _processPendingVehicles() async {
+    final QuerySnapshot pendingSnapshot =
+        await _firestore.collection('pendingVehicles').get();
+    for (final doc in pendingSnapshot.docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final vehicleId = data['vehicleId'];
+      final slotClass = data['class'];
+      final entryTime = data['time'];
+
+      final DocumentSnapshot slotSnapshot =
+          await _firestore.collection('parkingSlots').doc(slotClass).get();
+      if (slotSnapshot.exists) {
+        final slotData = slotSnapshot.data() as Map<String, dynamic>;
+        final slots = slotData['slots'] as List<dynamic>;
+
+        final availableSlot = slots.firstWhere(
+          (slot) => slot['isFilled'] == false,
+          orElse: () => null,
+        );
+
+        if (availableSlot != null) {
+          availableSlot['vehicleId'] = vehicleId;
+          availableSlot['entryTime'] = entryTime;
+          availableSlot['isFilled'] = true;
+
+          await _firestore
+              .collection('parkingSlots')
+              .doc(slotClass)
+              .update({'slots': slots});
+          await _firestore.collection('pendingVehicles').doc(doc.id).delete();
+        } else {
+          await _handleVehicleFull(slotClass, vehicleId, entryTime);
+        }
+      } else {
+        await _handleVehicleFull(slotClass, vehicleId, entryTime);
+      }
+    }
+  }
+
+  void _notifyUserVehicleFull(String slotClass) {
+    // Logic to send notification to the user
+    print("Slot $slotClass is full. Please turn back.");
+    // Add notification logic here
   }
 
   @override
@@ -138,6 +220,16 @@ class _DashboardPageState extends State<DashboardPage> {
         title: Text('Dashboard', style: TextStyle(color: Colors.blue)),
         backgroundColor: Colors.white,
         iconTheme: IconThemeData(color: Colors.blue),
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: Colors.blue,
+          indicatorColor: Colors.cyan,
+          tabs: [
+            Tab(text: 'Parked Vehicles'),
+            Tab(text: 'Exited Vehicles'),
+            Tab(text: 'Canceled Vehicles'),
+          ],
+        ),
       ),
       drawer: CommonDrawer(),
       body: FutureBuilder<Map<String, dynamic>>(
@@ -193,78 +285,13 @@ class _DashboardPageState extends State<DashboardPage> {
                 ),
               ),
               Expanded(
-                child: StreamBuilder<QuerySnapshot>(
-                  stream: _firestore
-                      .collection('detections')
-                      .orderBy('time', descending: _sortOrder == 'desc')
-                      .snapshots(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return Center(
-                          child: CircularProgressIndicator(color: Colors.cyan));
-                    }
-                    if (snapshot.hasError) {
-                      return Center(
-                          child: Text('Error fetching detections',
-                              style: TextStyle(color: Colors.red)));
-                    }
-                    if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                      return Center(
-                          child: Text('No detections found',
-                              style: TextStyle(color: Colors.red)));
-                    }
-
-                    var detections = snapshot.data!.docs;
-                    detections.sort((a, b) => _sortOrder == 'desc'
-                        ? int.parse(b['VehicleID'].toString())
-                            .compareTo(int.parse(a['VehicleID'].toString()))
-                        : int.parse(a['VehicleID'].toString())
-                            .compareTo(int.parse(b['VehicleID'].toString())));
-                    var parkedVehicles = detections
-                        .where((d) =>
-                            !(parkingStatus[d['VehicleID'].toString()] ??
-                                false))
-                        .toList();
-                    var exitedVehicles = detections
-                        .where((d) =>
-                            parkingStatus[d['VehicleID'].toString()] ?? false)
-                        .toList();
-
-                    return ListView(
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Text('Parked Vehicles',
-                              style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.blue)),
-                        ),
-                        ...parkedVehicles.map((detection) {
-                          var data = detection.data() as Map<String, dynamic>;
-                          var entryTime = _formatTimestamp(data['time']);
-                          var vehicleId = data['VehicleID'].toString();
-                          return _buildDetectionCard(context, vehicleId, data,
-                              entryTime, 'Parked', parkingStatus[vehicleId]);
-                        }).toList(),
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Text('Exited Vehicles',
-                              style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.blue)),
-                        ),
-                        ...exitedVehicles.map((detection) {
-                          var data = detection.data() as Map<String, dynamic>;
-                          var entryTime = _formatTimestamp(data['time']);
-                          var vehicleId = data['VehicleID'].toString();
-                          return _buildDetectionCard(context, vehicleId, data,
-                              entryTime, 'Exited', parkingStatus[vehicleId]);
-                        }).toList(),
-                      ],
-                    );
-                  },
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildParkedVehiclesTab(),
+                    _buildExitedVehiclesTab(),
+                    _buildCanceledVehiclesTab(),
+                  ],
                 ),
               ),
             ],
@@ -274,7 +301,180 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // Build detection card widget for parked and exited vehicles
+  Widget _buildParkedVehiclesTab() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore
+          .collection('detections')
+          .orderBy('time', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator(color: Colors.cyan));
+        }
+        if (snapshot.hasError) {
+          return Center(
+              child: Text('Error fetching detections',
+                  style: TextStyle(color: Colors.red)));
+        }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return Center(
+              child: Text('No detections found',
+                  style: TextStyle(color: Colors.red)));
+        }
+
+        var detections = snapshot.data!.docs;
+        detections.sort((a, b) => _sortOrder == 'desc'
+            ? int.parse(b['VehicleID'].toString())
+                .compareTo(int.parse(a['VehicleID'].toString()))
+            : int.parse(a['VehicleID'].toString())
+                .compareTo(int.parse(b['VehicleID'].toString())));
+        var parkedVehicles = detections
+            .where((d) => !(parkingStatus[d['VehicleID'].toString()] ?? false))
+            .toList();
+
+        return ListView(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text('Parked Vehicles',
+                  style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue)),
+            ),
+            if (fullSlotsStatus['A']!) ...[
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Text('Class A is Full',
+                    style: TextStyle(fontSize: 16, color: Colors.red)),
+              ),
+            ],
+            if (fullSlotsStatus['B']!) ...[
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Text('Class B is Full',
+                    style: TextStyle(fontSize: 16, color: Colors.red)),
+              ),
+            ],
+            if (fullSlotsStatus['C']!) ...[
+              Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Text('Class C is Full',
+                    style: TextStyle(fontSize: 16, color: Colors.red)),
+              ),
+            ],
+            ...parkedVehicles.map((detection) {
+              var data = detection.data() as Map<String, dynamic>;
+              var entryTime = _formatTimestamp(data['time']);
+              var vehicleId = data['VehicleID'].toString();
+              return _buildDetectionCard(context, vehicleId, data, entryTime,
+                  'Parked', parkingStatus[vehicleId]);
+            }).toList(),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildExitedVehiclesTab() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore
+          .collection('detections')
+          .orderBy('time', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator(color: Colors.cyan));
+        }
+        if (snapshot.hasError) {
+          return Center(
+              child: Text('Error fetching detections',
+                  style: TextStyle(color: Colors.red)));
+        }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return Center(
+              child: Text('No detections found',
+                  style: TextStyle(color: Colors.red)));
+        }
+
+        var detections = snapshot.data!.docs;
+        detections.sort((a, b) => _sortOrder == 'desc'
+            ? int.parse(b['VehicleID'].toString())
+                .compareTo(int.parse(a['VehicleID'].toString()))
+            : int.parse(a['VehicleID'].toString())
+                .compareTo(int.parse(b['VehicleID'].toString())));
+        var exitedVehicles = detections
+            .where((d) => parkingStatus[d['VehicleID'].toString()] ?? false)
+            .toList();
+
+        return ListView(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text('Exited Vehicles',
+                  style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue)),
+            ),
+            ...exitedVehicles.map((detection) {
+              var data = detection.data() as Map<String, dynamic>;
+              var entryTime = _formatTimestamp(data['time']);
+              var vehicleId = data['VehicleID'].toString();
+              return _buildDetectionCard(context, vehicleId, data, entryTime,
+                  'Exited', parkingStatus[vehicleId]);
+            }).toList(),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildCanceledVehiclesTab() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _firestore
+          .collection('canceledVehicles')
+          .orderBy('time', descending: true)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(child: CircularProgressIndicator(color: Colors.cyan));
+        }
+        if (snapshot.hasError) {
+          return Center(
+              child: Text('Error fetching cancellations',
+                  style: TextStyle(color: Colors.red)));
+        }
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return Center(
+              child: Text('No cancellations found',
+                  style: TextStyle(color: Colors.red)));
+        }
+
+        var canceledVehicles = snapshot.data!.docs;
+        return ListView(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Text('Canceled Vehicles',
+                  style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blue)),
+            ),
+            ...canceledVehicles.map((detection) {
+              var data = detection.data() as Map<String, dynamic>;
+              var entryTime = _formatTimestamp(data['time']);
+              var vehicleId = data['vehicleId'].toString();
+              return _buildDetectionCard(context, vehicleId, data, entryTime,
+                  'Canceled', parkingStatus[vehicleId]);
+            }).toList(),
+          ],
+        );
+      },
+    );
+  }
+
   Widget _buildDetectionCard(
       BuildContext context,
       String vehicleId,
@@ -338,7 +538,6 @@ class _RealTimeClockState extends State<RealTimeClock> {
     super.dispose();
   }
 
-  // Update the current time and date every second
   void _updateTime() {
     setState(() {
       _currentTime = _formatCurrentTime();
@@ -346,12 +545,10 @@ class _RealTimeClockState extends State<RealTimeClock> {
     });
   }
 
-  // Format the current time to HH:mm:ss
   String _formatCurrentTime() {
     return DateFormat('HH:mm:ss').format(DateTime.now());
   }
 
-  // Format the current date to EEEE, dd MMMM yyyy
   String _formatCurrentDate() {
     return DateFormat('EEEE, dd MMMM yyyy').format(DateTime.now());
   }
