@@ -10,28 +10,31 @@ class DashboardPage extends StatefulWidget {
   _DashboardPageState createState() => _DashboardPageState();
 }
 
-class _DashboardPageState extends State<DashboardPage> {
+class _DashboardPageState extends State<DashboardPage>
+    with SingleTickerProviderStateMixin {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   String _sortOrder = 'desc';
   late StreamSubscription<QuerySnapshot> _detectionSubscription;
   late StreamSubscription<QuerySnapshot> _paymentSubscription;
   Map<String, bool> parkingStatus = {};
+  late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
     _startListeningToDetections();
     _startListeningToPayments();
+    _tabController = TabController(length: 2, vsync: this);
   }
 
   @override
   void dispose() {
     _detectionSubscription.cancel();
     _paymentSubscription.cancel();
+    _tabController.dispose();
     super.dispose();
   }
 
-  // Fetch admin data from Firestore
   Future<Map<String, dynamic>> _fetchAdminData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
@@ -41,14 +44,12 @@ class _DashboardPageState extends State<DashboardPage> {
     return {};
   }
 
-  // Format Firestore timestamp to readable string
   String _formatTimestamp(dynamic timestamp) {
     var date = DateTime.fromMillisecondsSinceEpoch(
         (timestamp is int ? timestamp : (timestamp as double).toInt()) * 1000);
     return DateFormat('yyyy-MM-dd HH:mm:ss').format(date);
   }
 
-  // Start listening to detections collection for real-time updates
   void _startListeningToDetections() {
     _detectionSubscription =
         _firestore.collection('detections').snapshots().listen((snapshot) {
@@ -56,7 +57,6 @@ class _DashboardPageState extends State<DashboardPage> {
     });
   }
 
-  // Start listening to payments collection for real-time updates
   void _startListeningToPayments() {
     _paymentSubscription =
         _firestore.collection('payment').snapshots().listen((snapshot) {
@@ -64,13 +64,12 @@ class _DashboardPageState extends State<DashboardPage> {
         parkingStatus = {};
         for (var doc in snapshot.docs) {
           var data = doc.data() as Map<String, dynamic>;
-          parkingStatus[data['vehicleId'].toString()] = true; // Mark as exited
+          parkingStatus[data['vehicleId'].toString()] = true;
         }
       });
     });
   }
 
-  // Synchronize parking slots with detections data from Firestore
   Future<void> _synchronizeParkingSlots(
       List<QueryDocumentSnapshot> detectionDocs) async {
     try {
@@ -121,9 +120,10 @@ class _DashboardPageState extends State<DashboardPage> {
             }
           }
 
-          await _firestore.collection('parkingSlots').doc(className).update({
-            'slots': slots,
-          });
+          await _firestore
+              .collection('parkingSlots')
+              .doc(className)
+              .update({'slots': slots});
         }
       }
     } catch (e) {
@@ -138,6 +138,13 @@ class _DashboardPageState extends State<DashboardPage> {
         title: Text('Dashboard', style: TextStyle(color: Colors.blue)),
         backgroundColor: Colors.white,
         iconTheme: IconThemeData(color: Colors.blue),
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: [
+            Tab(text: 'Parked Vehicles'),
+            Tab(text: 'Exited Vehicles'),
+          ],
+        ),
       ),
       drawer: CommonDrawer(),
       body: FutureBuilder<Map<String, dynamic>>(
@@ -230,38 +237,43 @@ class _DashboardPageState extends State<DashboardPage> {
                             parkingStatus[d['VehicleID'].toString()] ?? false)
                         .toList();
 
-                    return ListView(
+                    return TabBarView(
+                      controller: _tabController,
                       children: [
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Text('Parked Vehicles',
-                              style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.blue)),
+                        ListView(
+                          children: [
+                            ...parkedVehicles.map((detection) {
+                              var data =
+                                  detection.data() as Map<String, dynamic>;
+                              var entryTime = _formatTimestamp(data['time']);
+                              var vehicleId = data['VehicleID'].toString();
+                              return _buildDetectionCard(
+                                  context,
+                                  vehicleId,
+                                  data,
+                                  entryTime,
+                                  'Parked',
+                                  parkingStatus[vehicleId]);
+                            }).toList(),
+                          ],
                         ),
-                        ...parkedVehicles.map((detection) {
-                          var data = detection.data() as Map<String, dynamic>;
-                          var entryTime = _formatTimestamp(data['time']);
-                          var vehicleId = data['VehicleID'].toString();
-                          return _buildDetectionCard(context, vehicleId, data,
-                              entryTime, 'Parked', parkingStatus[vehicleId]);
-                        }).toList(),
-                        Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Text('Exited Vehicles',
-                              style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.blue)),
+                        ListView(
+                          children: [
+                            ...exitedVehicles.map((detection) {
+                              var data =
+                                  detection.data() as Map<String, dynamic>;
+                              var entryTime = _formatTimestamp(data['time']);
+                              var vehicleId = data['VehicleID'].toString();
+                              return _buildDetectionCard(
+                                  context,
+                                  vehicleId,
+                                  data,
+                                  entryTime,
+                                  'Exited',
+                                  parkingStatus[vehicleId]);
+                            }).toList(),
+                          ],
                         ),
-                        ...exitedVehicles.map((detection) {
-                          var data = detection.data() as Map<String, dynamic>;
-                          var entryTime = _formatTimestamp(data['time']);
-                          var vehicleId = data['VehicleID'].toString();
-                          return _buildDetectionCard(context, vehicleId, data,
-                              entryTime, 'Exited', parkingStatus[vehicleId]);
-                        }).toList(),
                       ],
                     );
                   },
@@ -274,7 +286,6 @@ class _DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // Build detection card widget for parked and exited vehicles
   Widget _buildDetectionCard(
       BuildContext context,
       String vehicleId,
@@ -338,7 +349,6 @@ class _RealTimeClockState extends State<RealTimeClock> {
     super.dispose();
   }
 
-  // Update the current time and date every second
   void _updateTime() {
     setState(() {
       _currentTime = _formatCurrentTime();
@@ -346,12 +356,10 @@ class _RealTimeClockState extends State<RealTimeClock> {
     });
   }
 
-  // Format the current time to HH:mm:ss
   String _formatCurrentTime() {
     return DateFormat('HH:mm:ss').format(DateTime.now());
   }
 
-  // Format the current date to EEEE, dd MMMM yyyy
   String _formatCurrentDate() {
     return DateFormat('EEEE, dd MMMM yyyy').format(DateTime.now());
   }

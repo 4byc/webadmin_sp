@@ -4,7 +4,6 @@ class GradientAppBar extends StatelessWidget implements PreferredSizeWidget {
   final String title;
   final List<Widget> actions;
 
-  // Constructor for GradientAppBar
   GradientAppBar({required this.title, this.actions = const []});
 
   @override

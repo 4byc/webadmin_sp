@@ -11,11 +11,10 @@ class ParkingLotPage extends StatefulWidget {
 
 class _ParkingLotPageState extends State<ParkingLotPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  String _selectedClass = 'A'; // Default class selection
-  String _sortOrder = 'asc'; // Default sorting order
-  String _filter = 'All'; // Default filter
+  String _selectedClass = 'A';
+  String _sortOrder = 'asc';
+  String _filter = 'All';
 
-  // Format Firestore timestamp to readable string
   String _formatTimestamp(dynamic timestamp) {
     if (timestamp == null) return 'N/A';
     var date = DateTime.fromMillisecondsSinceEpoch(
@@ -23,12 +22,10 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
     return DateFormat('yyyy-MM-dd HH:mm:ss').format(date);
   }
 
-  // Get a stream of parking slots for the selected class
   Stream<DocumentSnapshot> _getParkingSlotStream(String className) {
     return _firestore.collection('parkingSlots').doc(className).snapshots();
   }
 
-  // Filter parking slots based on the selected filter
   List<dynamic> _filterSlots(List<dynamic> slots) {
     if (_filter == 'Filled') {
       return slots.where((slot) => slot['isFilled'] == true).toList();
@@ -38,7 +35,6 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
     return slots;
   }
 
-  // Remove duplicate slots from the list
   List<dynamic> _removeDuplicateSlots(List<dynamic> slots) {
     var uniqueSlots = <String, dynamic>{};
     for (var slot in slots) {
@@ -47,7 +43,6 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
     return uniqueSlots.values.toList();
   }
 
-  // Sort the slots based on the selected sorting order
   List<dynamic> _sortSlots(List<dynamic> slots) {
     slots.sort((a, b) {
       var idA =
@@ -59,7 +54,6 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
     return slots;
   }
 
-  // Show details of the selected parking slot
   void _showSlotDetails(Map<String, dynamic> slot) {
     TextEditingController slotIdController = TextEditingController();
     TextEditingController messageController = TextEditingController();
@@ -119,7 +113,6 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
     );
   }
 
-  // Move data from one slot to another and impose fine
   Future<void> _moveSlotData(String oldSlotId, String newSlotId) async {
     var classDoc = _firestore.collection('parkingSlots').doc(_selectedClass);
     var snapshot = await classDoc.get();
@@ -134,12 +127,11 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
           orElse: () => null);
 
       if (oldSlot != null && newSlot != null) {
-        // Check if the user violated parking rules
         bool violated = oldSlot['vehicleId'] != null &&
             oldSlot['slotClass'] != newSlot['slotClass'];
         int fine = 0;
         if (violated) {
-          fine = _calculateFine(oldSlot['slotClass'], newSlot['slotClass']);
+          fine = 240000;
           _sendFineToUser(oldSlot['vehicleId'].toString(), fine);
         }
 
@@ -158,41 +150,15 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
     }
   }
 
-  int _calculateFine(String oldClass, String newClass) {
-    // Fine calculation logic based on parking rules
-    int fineAmount = 0;
-    if (oldClass != newClass) {
-      switch (newClass) {
-        case 'A':
-          fineAmount = 15000 * 24;
-          break;
-        case 'B':
-          fineAmount = 10000 * 24;
-          break;
-        case 'C':
-          fineAmount = 5000 * 24;
-          break;
-        default:
-          fineAmount = 0;
-      }
-    }
-    return fineAmount;
-  }
-
   Future<void> _sendFineToUser(String vehicleId, int fine) async {
     var userDoc = _firestore.collection('fines').doc(vehicleId);
-    await userDoc.set({
-      'fine': fine,
-    }, SetOptions(merge: true));
+    await userDoc.set({'fine': fine}, SetOptions(merge: true));
   }
 
-  // Send a message to the user
   Future<void> _sendMessageToUser(String vehicleId, String message) async {
     if (vehicleId.isNotEmpty) {
       var userDoc = _firestore.collection('users').doc(vehicleId);
-      await userDoc.set({
-        'message': message,
-      }, SetOptions(merge: true));
+      await userDoc.set({'message': message}, SetOptions(merge: true));
     }
   }
 
@@ -202,7 +168,6 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
       appBar: GradientAppBar(
         title: 'Parking Lot',
         actions: <Widget>[
-          // Dropdown menu for class selection
           DropdownButton<String>(
             value: _selectedClass,
             dropdownColor: Colors.blue,
@@ -215,26 +180,21 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
                 .map<DropdownMenuItem<String>>((String value) {
               return DropdownMenuItem<String>(
                 value: value,
-                child: Text(
-                  'Class $value',
-                  style: TextStyle(color: Colors.white),
-                ),
+                child:
+                    Text('Class $value', style: TextStyle(color: Colors.white)),
               );
             }).toList(),
           ),
-          // Icon button for sorting order
           IconButton(
             icon: Icon(
-              _sortOrder == 'asc' ? Icons.arrow_upward : Icons.arrow_downward,
-              color: Colors.white,
-            ),
+                _sortOrder == 'asc' ? Icons.arrow_upward : Icons.arrow_downward,
+                color: Colors.white),
             onPressed: () {
               setState(() {
                 _sortOrder = _sortOrder == 'asc' ? 'desc' : 'asc';
               });
             },
           ),
-          // Popup menu for filtering slots
           PopupMenuButton<String>(
             icon: Icon(Icons.filter_list, color: Colors.white),
             onSelected: (String result) {
@@ -244,17 +204,11 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
             },
             itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
               const PopupMenuItem<String>(
-                value: 'All',
-                child: Text('Show All'),
-              ),
+                  value: 'All', child: Text('Show All')),
               const PopupMenuItem<String>(
-                value: 'Filled',
-                child: Text('Show Filled'),
-              ),
+                  value: 'Filled', child: Text('Show Filled')),
               const PopupMenuItem<String>(
-                value: 'Empty',
-                child: Text('Show Empty'),
-              ),
+                  value: 'Empty', child: Text('Show Empty')),
             ],
           ),
         ],
@@ -308,13 +262,9 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          'Slot ID: ${slot['id']}',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        Text('Slot ID: ${slot['id']}',
+                            style: TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold)),
                         SizedBox(height: 8),
                         Text(isFilled ? 'Filled' : 'Empty'),
                       ],

@@ -13,7 +13,6 @@ class _HistoryPageState extends State<HistoryPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   String _sortOrder = 'desc';
 
-  // Format Firestore timestamp to readable string
   String _formatTimestamp(dynamic timestamp) {
     if (timestamp == null) return 'N/A';
     var date = DateTime.fromMillisecondsSinceEpoch(
@@ -21,7 +20,6 @@ class _HistoryPageState extends State<HistoryPage> {
     return DateFormat('yyyy-MM-dd HH:mm:ss').format(date);
   }
 
-  // Edit payment record dialog
   void _editPayment(BuildContext context, String paymentId,
       Map<String, dynamic> paymentData) {
     var vehicleIdController =
@@ -46,29 +44,23 @@ class _HistoryPageState extends State<HistoryPage> {
             child: Column(
               children: [
                 TextField(
-                  controller: vehicleIdController,
-                  decoration: InputDecoration(labelText: 'Vehicle ID'),
-                ),
+                    controller: vehicleIdController,
+                    decoration: InputDecoration(labelText: 'Vehicle ID')),
                 TextField(
-                  controller: slotClassController,
-                  decoration: InputDecoration(labelText: 'Class'),
-                ),
+                    controller: slotClassController,
+                    decoration: InputDecoration(labelText: 'Class')),
                 TextField(
-                  controller: exitTimeController,
-                  decoration: InputDecoration(labelText: 'Exit Time'),
-                ),
+                    controller: exitTimeController,
+                    decoration: InputDecoration(labelText: 'Exit Time')),
                 TextField(
-                  controller: durationController,
-                  decoration: InputDecoration(labelText: 'Duration'),
-                ),
+                    controller: durationController,
+                    decoration: InputDecoration(labelText: 'Duration')),
                 TextField(
-                  controller: totalCostController,
-                  decoration: InputDecoration(labelText: 'Total Cost'),
-                ),
+                    controller: totalCostController,
+                    decoration: InputDecoration(labelText: 'Total Cost')),
                 TextField(
-                  controller: fineController,
-                  decoration: InputDecoration(labelText: 'Fine'),
-                ),
+                    controller: fineController,
+                    decoration: InputDecoration(labelText: 'Fine')),
               ],
             ),
           ),
@@ -97,7 +89,6 @@ class _HistoryPageState extends State<HistoryPage> {
                     .collection('payment')
                     .doc(paymentId)
                     .update(updatedData);
-
                 Navigator.of(context).pop();
               },
             ),
@@ -107,7 +98,6 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  // Confirm delete payment record dialog
   void _confirmDelete(BuildContext context, String paymentId) {
     showDialog(
       context: context,
@@ -174,7 +164,6 @@ class _HistoryPageState extends State<HistoryPage> {
             itemBuilder: (context, index) {
               var payment = payments[index].data() as Map<String, dynamic>;
               var paymentId = payments[index].id;
-
               var vehicleId = payment['vehicleId'] ?? 'N/A';
               var slotClass = payment['slotClass'] ?? 'N/A';
               var exitTime = _formatTimestamp(payment['exitTime']);
@@ -216,13 +205,13 @@ class _HistoryPageState extends State<HistoryPage> {
                         Text('Parking Duration: $parkingDuration seconds',
                             style: TextStyle(fontSize: 16)),
                         SizedBox(height: 8),
-                        Text('Parking Fee: \Rp ${parkingFee}',
+                        Text('Parking Fee: \Rp $parkingFee',
                             style: TextStyle(fontSize: 16)),
                         SizedBox(height: 8),
-                        Text('Fine: \Rp ${fine}',
+                        Text('Fine: \Rp $fine',
                             style: TextStyle(fontSize: 16, color: Colors.red)),
                         SizedBox(height: 8),
-                        Text('Total Amount: \Rp ${finalAmount}',
+                        Text('Total Amount: \Rp $finalAmount',
                             style: TextStyle(
                                 fontSize: 16, fontWeight: FontWeight.bold)),
                         Row(
