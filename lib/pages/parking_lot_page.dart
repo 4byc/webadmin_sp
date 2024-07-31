@@ -131,7 +131,7 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
             oldSlot['slotClass'] != newSlot['slotClass'];
         int fine = 0;
         if (violated) {
-          fine = _calculateFine(oldSlot['slotClass'], newSlot['slotClass']);
+          fine = 240000;
           _sendFineToUser(oldSlot['vehicleId'].toString(), fine);
         }
 
@@ -150,110 +150,15 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
     }
   }
 
-  int _calculateFine(String oldClass, String newClass) {
-    int fineAmount = 0;
-    if (oldClass != newClass) {
-      switch (newClass) {
-        case 'A':
-          fineAmount = 15000 * 24;
-          break;
-        case 'B':
-          fineAmount = 10000 * 24;
-          break;
-        case 'C':
-          fineAmount = 5000 * 24;
-          break;
-        default:
-          fineAmount = 0;
-      }
-    }
-    return fineAmount;
-  }
-
   Future<void> _sendFineToUser(String vehicleId, int fine) async {
     var userDoc = _firestore.collection('fines').doc(vehicleId);
-    await userDoc.set({
-      'fine': fine,
-    }, SetOptions(merge: true));
+    await userDoc.set({'fine': fine}, SetOptions(merge: true));
   }
 
   Future<void> _sendMessageToUser(String vehicleId, String message) async {
     if (vehicleId.isNotEmpty) {
       var userDoc = _firestore.collection('users').doc(vehicleId);
-      await userDoc.set({
-        'message': message,
-      }, SetOptions(merge: true));
-    }
-  }
-
-  Future<void> processPendingVehicles() async {
-    final QuerySnapshot pendingSnapshot =
-        await _firestore.collection('pendingVehicles').get();
-    for (final doc in pendingSnapshot.docs) {
-      final data = doc.data() as Map<String, dynamic>;
-      final vehicleId = data['vehicleId'];
-      final slotClass = data['class'];
-      final entryTime = data['time'];
-
-      final DocumentSnapshot slotSnapshot =
-          await _firestore.collection('parkingSlots').doc(slotClass).get();
-      if (slotSnapshot.exists) {
-        final slotData = slotSnapshot.data() as Map<String, dynamic>;
-        final slots = slotData['slots'] as List<dynamic>;
-
-        final availableSlot = slots.firstWhere(
-          (slot) => slot['isFilled'] == false,
-          orElse: () => null,
-        );
-
-        if (availableSlot != null) {
-          availableSlot['vehicleId'] = vehicleId;
-          availableSlot['entryTime'] = entryTime;
-          availableSlot['isFilled'] = true;
-
-          await _firestore
-              .collection('parkingSlots')
-              .doc(slotClass)
-              .update({'slots': slots});
-          await _firestore.collection('pendingVehicles').doc(doc.id).delete();
-        } else {
-          var exitTime = DateTime.now().millisecondsSinceEpoch;
-          await _firestore.collection('canceledVehicles').add({
-            'vehicleId': vehicleId,
-            'class': slotClass,
-            'time': entryTime,
-          });
-          await _firestore.collection('payment').add({
-            'vehicleId': vehicleId,
-            'slotClass': slotClass,
-            'entryTime': entryTime,
-            'exitTime': exitTime,
-            'duration': 0,
-            'totalCost': 0,
-            'fine': 0,
-            'finalAmount': 0,
-            'status': 'Canceled'
-          });
-        }
-      } else {
-        var exitTime = DateTime.now().millisecondsSinceEpoch;
-        await _firestore.collection('canceledVehicles').add({
-          'vehicleId': vehicleId,
-          'class': slotClass,
-          'time': entryTime,
-        });
-        await _firestore.collection('payment').add({
-          'vehicleId': vehicleId,
-          'slotClass': slotClass,
-          'entryTime': entryTime,
-          'exitTime': exitTime,
-          'duration': 0,
-          'totalCost': 0,
-          'fine': 0,
-          'finalAmount': 0,
-          'status': 'Canceled'
-        });
-      }
+      await userDoc.set({'message': message}, SetOptions(merge: true));
     }
   }
 
@@ -275,18 +180,15 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
                 .map<DropdownMenuItem<String>>((String value) {
               return DropdownMenuItem<String>(
                 value: value,
-                child: Text(
-                  'Class $value',
-                  style: TextStyle(color: Colors.white),
-                ),
+                child:
+                    Text('Class $value', style: TextStyle(color: Colors.white)),
               );
             }).toList(),
           ),
           IconButton(
             icon: Icon(
-              _sortOrder == 'asc' ? Icons.arrow_upward : Icons.arrow_downward,
-              color: Colors.white,
-            ),
+                _sortOrder == 'asc' ? Icons.arrow_upward : Icons.arrow_downward,
+                color: Colors.white),
             onPressed: () {
               setState(() {
                 _sortOrder = _sortOrder == 'asc' ? 'desc' : 'asc';
@@ -302,17 +204,11 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
             },
             itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
               const PopupMenuItem<String>(
-                value: 'All',
-                child: Text('Show All'),
-              ),
+                  value: 'All', child: Text('Show All')),
               const PopupMenuItem<String>(
-                value: 'Filled',
-                child: Text('Show Filled'),
-              ),
+                  value: 'Filled', child: Text('Show Filled')),
               const PopupMenuItem<String>(
-                value: 'Empty',
-                child: Text('Show Empty'),
-              ),
+                  value: 'Empty', child: Text('Show Empty')),
             ],
           ),
         ],
@@ -366,13 +262,9 @@ class _ParkingLotPageState extends State<ParkingLotPage> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          'Slot ID: ${slot['id']}',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        Text('Slot ID: ${slot['id']}',
+                            style: TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold)),
                         SizedBox(height: 8),
                         Text(isFilled ? 'Filled' : 'Empty'),
                       ],

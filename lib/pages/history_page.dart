@@ -21,7 +21,7 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   void _editPayment(BuildContext context, String paymentId,
-      Map<String, dynamic> paymentData, String collection) {
+      Map<String, dynamic> paymentData) {
     var vehicleIdController =
         TextEditingController(text: paymentData['vehicleId'].toString());
     var slotClassController =
@@ -44,29 +44,23 @@ class _HistoryPageState extends State<HistoryPage> {
             child: Column(
               children: [
                 TextField(
-                  controller: vehicleIdController,
-                  decoration: InputDecoration(labelText: 'Vehicle ID'),
-                ),
+                    controller: vehicleIdController,
+                    decoration: InputDecoration(labelText: 'Vehicle ID')),
                 TextField(
-                  controller: slotClassController,
-                  decoration: InputDecoration(labelText: 'Class'),
-                ),
+                    controller: slotClassController,
+                    decoration: InputDecoration(labelText: 'Class')),
                 TextField(
-                  controller: exitTimeController,
-                  decoration: InputDecoration(labelText: 'Exit Time'),
-                ),
+                    controller: exitTimeController,
+                    decoration: InputDecoration(labelText: 'Exit Time')),
                 TextField(
-                  controller: durationController,
-                  decoration: InputDecoration(labelText: 'Duration'),
-                ),
+                    controller: durationController,
+                    decoration: InputDecoration(labelText: 'Duration')),
                 TextField(
-                  controller: totalCostController,
-                  decoration: InputDecoration(labelText: 'Total Cost'),
-                ),
+                    controller: totalCostController,
+                    decoration: InputDecoration(labelText: 'Total Cost')),
                 TextField(
-                  controller: fineController,
-                  decoration: InputDecoration(labelText: 'Fine'),
-                ),
+                    controller: fineController,
+                    decoration: InputDecoration(labelText: 'Fine')),
               ],
             ),
           ),
@@ -92,10 +86,9 @@ class _HistoryPageState extends State<HistoryPage> {
                 };
 
                 await _firestore
-                    .collection(collection)
+                    .collection('payment')
                     .doc(paymentId)
                     .update(updatedData);
-
                 Navigator.of(context).pop();
               },
             ),
@@ -105,8 +98,7 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
-  void _confirmDelete(
-      BuildContext context, String paymentId, String collection) {
+  void _confirmDelete(BuildContext context, String paymentId) {
     showDialog(
       context: context,
       builder: (context) {
@@ -123,7 +115,7 @@ class _HistoryPageState extends State<HistoryPage> {
             TextButton(
               child: Text('Delete'),
               onPressed: () async {
-                await _firestore.collection(collection).doc(paymentId).delete();
+                await _firestore.collection('payment').doc(paymentId).delete();
                 Navigator.of(context).pop();
               },
             ),
@@ -172,7 +164,6 @@ class _HistoryPageState extends State<HistoryPage> {
             itemBuilder: (context, index) {
               var payment = payments[index].data() as Map<String, dynamic>;
               var paymentId = payments[index].id;
-
               var vehicleId = payment['vehicleId'] ?? 'N/A';
               var slotClass = payment['slotClass'] ?? 'N/A';
               var exitTime = _formatTimestamp(payment['exitTime']);
@@ -214,13 +205,13 @@ class _HistoryPageState extends State<HistoryPage> {
                         Text('Parking Duration: $parkingDuration seconds',
                             style: TextStyle(fontSize: 16)),
                         SizedBox(height: 8),
-                        Text('Parking Fee: \Rp ${parkingFee}',
+                        Text('Parking Fee: \Rp $parkingFee',
                             style: TextStyle(fontSize: 16)),
                         SizedBox(height: 8),
-                        Text('Fine: \Rp ${fine}',
+                        Text('Fine: \Rp $fine',
                             style: TextStyle(fontSize: 16, color: Colors.red)),
                         SizedBox(height: 8),
-                        Text('Total Amount: \Rp ${finalAmount}',
+                        Text('Total Amount: \Rp $finalAmount',
                             style: TextStyle(
                                 fontSize: 16, fontWeight: FontWeight.bold)),
                         Row(
@@ -229,14 +220,13 @@ class _HistoryPageState extends State<HistoryPage> {
                             IconButton(
                               icon: Icon(Icons.edit),
                               onPressed: () {
-                                _editPayment(
-                                    context, paymentId, payment, 'payment');
+                                _editPayment(context, paymentId, payment);
                               },
                             ),
                             IconButton(
                               icon: Icon(Icons.delete),
                               onPressed: () {
-                                _confirmDelete(context, paymentId, 'payment');
+                                _confirmDelete(context, paymentId);
                               },
                             ),
                           ],

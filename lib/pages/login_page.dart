@@ -14,18 +14,15 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Access the authentication provider
     final authProvider = Provider.of<local_auth_provider.AuthProvider>(context);
 
     return Scaffold(
       body: Stack(
         children: [
-          // Background image
           Container(
             decoration: BoxDecoration(
               image: DecorationImage(
-                image: AssetImage(
-                    'images/background.jpg'), // Your background image
+                image: AssetImage('images/background.jpg'),
                 fit: BoxFit.cover,
               ),
             ),
@@ -46,13 +43,11 @@ class _LoginPageState extends State<LoginPage> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: <Widget>[
-                          // App icon
                           Image.asset(
                             'images/icon.png',
                             height: 100,
                           ),
                           SizedBox(height: 20),
-                          // Login title
                           Text(
                             'Admin Login',
                             style: TextStyle(
@@ -62,7 +57,6 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                           ),
                           SizedBox(height: 20),
-                          // Email text field
                           TextField(
                             controller: _emailController,
                             decoration: InputDecoration(
@@ -78,7 +72,6 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                           ),
                           SizedBox(height: 20),
-                          // Password text field
                           TextField(
                             controller: _passwordController,
                             decoration: InputDecoration(
@@ -95,7 +88,6 @@ class _LoginPageState extends State<LoginPage> {
                             obscureText: true,
                           ),
                           SizedBox(height: 20),
-                          // Login button
                           ElevatedButton(
                             onPressed: () async {
                               bool success = await authProvider.signIn(
