@@ -24,7 +24,7 @@ class _DashboardPageState extends State<DashboardPage>
     super.initState();
     _startListeningToDetections();
     _startListeningToPayments();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
   }
 
   @override
@@ -67,6 +67,8 @@ class _DashboardPageState extends State<DashboardPage>
           parkingStatus[data['vehicleId'].toString()] = true;
         }
       });
+      // After updating payment status, try to park waiting vehicles
+      _processWaitingVehicles();
     });
   }
 
@@ -105,6 +107,7 @@ class _DashboardPageState extends State<DashboardPage>
           for (var vehicleID in detections.keys) {
             var detection = detections[vehicleID];
             if (detection['class'] == className) {
+              bool isParked = false;
               for (var slot in slots) {
                 if (slot['isFilled'] == false) {
                   var entryTime = detection['time'] is double
@@ -114,8 +117,16 @@ class _DashboardPageState extends State<DashboardPage>
                   slot['isFilled'] = true;
                   slot['vehicleId'] = vehicleID;
                   slot['slotClass'] = detection['class'];
+                  isParked = true;
                   break;
                 }
+              }
+              if (!isParked) {
+                // Mark the vehicle as hold if no parking slot is available
+                await _firestore
+                    .collection('detections')
+                    .doc(detection['id'])
+                    .update({'status': 'Hold'});
               }
             }
           }
@@ -124,10 +135,74 @@ class _DashboardPageState extends State<DashboardPage>
               .collection('parkingSlots')
               .doc(className)
               .update({'slots': slots});
+
+          // Check if parking is full
+          bool isFull = slots.every((slot) => slot['isFilled'] == true);
+          if (isFull) {
+            // Notify that the parking lot is full
+            await _sendFullNotification(className);
+          }
         }
       }
     } catch (e) {
       print('Error synchronizing parking slots: $e');
+    }
+  }
+
+  Future<void> _sendFullNotification(String className) async {
+    var notification = {
+      'message': 'Parking lot for class $className is full. Please turn back.',
+      'timestamp': FieldValue.serverTimestamp(),
+    };
+    await _firestore.collection('notifications').add(notification);
+  }
+
+  Future<void> _processWaitingVehicles() async {
+    QuerySnapshot detectionSnapshot = await _firestore
+        .collection('detections')
+        .where('status', isEqualTo: 'Hold')
+        .orderBy('time')
+        .limit(1)
+        .get();
+
+    if (detectionSnapshot.docs.isNotEmpty) {
+      var waitingVehicleDoc = detectionSnapshot.docs.first;
+      var waitingVehicleData = waitingVehicleDoc.data() as Map<String, dynamic>;
+
+      String vehicleClass = waitingVehicleData['class'];
+      DocumentSnapshot parkingSlotSnapshot =
+          await _firestore.collection('parkingSlots').doc(vehicleClass).get();
+
+      if (parkingSlotSnapshot.exists) {
+        var parkingSlotsData =
+            parkingSlotSnapshot.data() as Map<String, dynamic>;
+        List<dynamic> slots = parkingSlotsData['slots'] ?? [];
+
+        var availableSlot = slots.firstWhere(
+            (slot) => slot['isFilled'] == false,
+            orElse: () => null);
+
+        if (availableSlot != null) {
+          var entryTime = waitingVehicleData['time'] is double
+              ? waitingVehicleData['time'].toInt()
+              : waitingVehicleData['time'];
+          availableSlot['entryTime'] = entryTime;
+          availableSlot['isFilled'] = true;
+          availableSlot['vehicleId'] = waitingVehicleData['VehicleID'];
+          availableSlot['slotClass'] = vehicleClass;
+
+          await _firestore
+              .collection('parkingSlots')
+              .doc(vehicleClass)
+              .update({'slots': slots});
+
+          // Remove waiting vehicle from detections
+          await _firestore
+              .collection('detections')
+              .doc(waitingVehicleDoc.id)
+              .delete();
+        }
+      }
     }
   }
 
@@ -143,6 +218,7 @@ class _DashboardPageState extends State<DashboardPage>
           tabs: [
             Tab(text: 'Parked Vehicles'),
             Tab(text: 'Exited Vehicles'),
+            Tab(text: 'Canceled Vehicles'),
           ],
         ),
       ),
@@ -273,6 +349,58 @@ class _DashboardPageState extends State<DashboardPage>
                                   parkingStatus[vehicleId]);
                             }).toList(),
                           ],
+                        ),
+                        StreamBuilder<QuerySnapshot>(
+                          stream: _firestore
+                              .collection('detections')
+                              .where('status', isEqualTo: 'Hold')
+                              .snapshots(),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return Center(
+                                  child: CircularProgressIndicator(
+                                      color: Colors.cyan));
+                            }
+                            if (snapshot.hasError) {
+                              return Center(
+                                  child: Text('Error fetching hold vehicles',
+                                      style: TextStyle(color: Colors.red)));
+                            }
+                            if (!snapshot.hasData ||
+                                snapshot.data!.docs.isEmpty) {
+                              return Center(
+                                  child: Text('No hold vehicles found',
+                                      style: TextStyle(color: Colors.red)));
+                            }
+
+                            var holdVehicles = snapshot.data!.docs;
+                            holdVehicles.sort((a, b) => _sortOrder == 'desc'
+                                ? int.parse(b['VehicleID'].toString())
+                                    .compareTo(
+                                        int.parse(a['VehicleID'].toString()))
+                                : int.parse(a['VehicleID'].toString())
+                                    .compareTo(
+                                        int.parse(b['VehicleID'].toString())));
+                            return ListView(
+                              children: [
+                                ...holdVehicles.map((detection) {
+                                  var data =
+                                      detection.data() as Map<String, dynamic>;
+                                  var entryTime =
+                                      _formatTimestamp(data['time']);
+                                  var vehicleId = data['VehicleID'].toString();
+                                  return _buildDetectionCard(
+                                      context,
+                                      vehicleId,
+                                      data,
+                                      entryTime,
+                                      'Hold',
+                                      parkingStatus[vehicleId]);
+                                }).toList(),
+                              ],
+                            );
+                          },
                         ),
                       ],
                     );
